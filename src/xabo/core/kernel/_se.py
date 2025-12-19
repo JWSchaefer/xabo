@@ -23,11 +23,6 @@ class SquaredExponential(Kernel):
         x: KernelInputA,
         x_tick: KernelInputB,
     ) -> KernelOutput:
-        if len(x.shape) == 1:
-            x = x[:, None]
-
-        if len(x_tick.shape) == 1:
-            x_tick = x_tick[:, None]
 
         diff = x[..., :, None, :] - x_tick[..., None, :, :]
 
