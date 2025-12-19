@@ -35,7 +35,7 @@ packages = ["src/xabo"]
 
 [tool.pytest]
 addopts = ["-ra", "-rP"]
-testpaths = ["tests"]
+#testpaths = ["tests"]
 
 [tool.ruff]
 
