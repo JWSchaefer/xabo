@@ -1,0 +1,92 @@
+%!TeX program = LuaLaTeX 
+\documentclass{article}
+\usepackage[top=2.5cm, bottom=2.5cm, left=3cm, right=3cm]{geometry}
+\usepackage{caption}
+\usepackage[sort&compress,numbers]{natbib}
+\usepackage{bm}
+\usepackage{parskip}
+\usepackage{dirtytalk}
+\usepackage{float}
+\usepackage[
+  product-units=single
+]{siunitx}
+\usepackage{tabularx}
+\usepackage{graphicx}
+\usepackage{lipsum}
+
+\usepackage{xcolor}
+\usepackage{listings}
+\usepackage{titlesec}
+
+\usepackage{mathtools}
+\usepackage{amssymb}
+\usepackage{amsthm}
+\usepackage{bm}
+\usepackage{fontspec}
+\usepackage{upgreek}
+
+\setmainfont{Charter}
+
+\usepackage[colorlinks=false,hidelinks]{hyperref}
+
+\usepackage{../shared/general}
+
+\newfontfamily{\ImperialSans}{Imperial Sans Text}[
+  UprightFont=*-Medium,
+  BoldFont=*-Bold,
+]
+\newfontface{\ImperialSansExtraBold}{Imperial Sans Text Extrabold}
+\newfontface{\ImperialSansBold}{Imperial Sans Text Bold}
+\newfontface{\ImperialSansExtraLight}{Imperial Sans Text Extralight}
+\newfontface{\ImperialSansSemiBold}{Imperial Sans Text Semibold}
+\newfontface{\ImperialSansLight}{Imperial Sans Text Light}
+
+
+\titleformat{\section}[hang]
+{\ImperialSansSemiBold\large}
+{\thesection}
+{1em}
+{\hspace{-0.4pt}\large}
+
+\titleformat{\subsection}[hang]
+{\ImperialSansSemiBold}
+{\thesection}
+{1em}
+{\hspace{-0.4pt}}
+
+\titleformat{\subsubsection}[hang]
+{\ImperialSans}
+{\thesection}
+{1em}
+{\hspace{-0.4pt}}
+
+\bibliographystyle{bib}
+
+\title{\ImperialSansBold Title \Huge}
+\date{}
+\author{
+	\begin{tabular}{@{}l@{\hspace{0.8cm}}r@{}}
+	Forename Surname & email@address.co.uk \\
+	\end{tabular}
+}
+
+\pagenumbering{gobble}
+
+% remove indentation
+\setlength{\parindent}{0pt}
+
+
+\begin{document}
+
+\maketitle
+
+\section{Section}
+\lipsum[1]
+
+\subsection{Subsection}
+\lipsum[2]
+
+\subsubsection{Subsubsection}
+\lipsum[3]
+
+\end{document}

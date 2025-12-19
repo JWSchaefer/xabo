@@ -1,0 +1,434 @@
+%!TeX program = LuaLaTeX 
+\documentclass{article}
+\usepackage[top=2.5cm, bottom=2.5cm, left=3cm, right=3cm]{geometry}
+\usepackage{caption}
+\usepackage[sort&compress,numbers]{natbib}
+\usepackage{bm}
+\usepackage{parskip}
+\usepackage{dirtytalk}
+\usepackage{float}
+\usepackage[
+  product-units=single
+]{siunitx}
+\usepackage{tabularx}
+\usepackage{graphicx}
+\usepackage{lipsum}
+\usepackage[nolist,nohyperlinks]{acronym}
+\usepackage{enumitem}
+\usepackage{tikz}
+\usepackage{tkz-graph}
+\usepackage{float}
+\usepackage{mathrsfs}
+\usepackage{pgfplots}
+\usepackage{caption}
+
+
+\usepackage{xcolor}
+\usepackage{listings}
+\usepackage{titlesec}
+
+\usepackage{fontspec}
+\usepackage{mathtools} 
+\usepackage[
+  warnings-off={
+    mathtools-colon,
+    mathtools-overbracket
+  }
+]{unicode-math}
+\usepackage{amsthm}     
+
+\setmainfont{Charter}
+\setmathfont{LatinModern Math}
+%\setmathfont{XITS Math}
+\usetikzlibrary{calc}
+\usetikzlibrary{arrows}
+
+\usepackage[colorlinks=false,hidelinks]{hyperref}
+
+\usepackage{../shared/general}
+
+\newfontfamily{\ImperialSans}{Imperial Sans Text}[
+  UprightFont=*-Medium,
+  BoldFont=*-Bold,
+]
+\newfontface{\ImperialSansExtraBold}{Imperial Sans Text Extrabold}
+\newfontface{\ImperialSansBold}{Imperial Sans Text Bold}
+\newfontface{\ImperialSansExtraLight}{Imperial Sans Text Extralight}
+\newfontface{\ImperialSansSemiBold}{Imperial Sans Text Semibold}
+\newfontface{\ImperialSansLight}{Imperial Sans Text Light}
+
+\pgfplotsset{compat=1.18}
+\titleformat{\section}[hang]
+{\ImperialSansSemiBold\large}
+{\thesection}
+{1em}
+{\hspace{-0.4pt}\large}
+
+\titleformat{\subsection}[hang]
+{\ImperialSansSemiBold}
+{\thesection}
+{1em}
+{\hspace{-0.4pt}}
+
+\titleformat{\subsubsection}[hang]
+{\ImperialSans}
+{\thesection}
+{1em}
+{\hspace{-0.4pt}}
+
+\bibliographystyle{bib}
+
+\title{\ImperialSansBold Generalised Multi-Fidelity Gaussian Processes \Huge}
+%\date{9\superscript{th} October 2025}
+\date{}
+\author{
+	\begin{tabular}{@{}l@{\hspace{0.8cm}}r@{}}
+    Joseph Whitaker Schaefer & j.schaefer24@imperial.ac.uk \\
+	\end{tabular}
+}
+
+\pagenumbering{gobble}
+
+% remove indentation
+\setlength{\parindent}{0pt}
+
+\newcommand{\xellind}[2]{{\vct{x}^{#1}_{#2}}}
+\newcommand{\yellind}[2]{{y^{#1}_{#2}}}
+
+\newcommand{\forrester}[1]{((6*(#1) - 2)^2 * sin(deg(12*(#1) - 4)))}
+\newcommand{\mfforrester}[4]{((#2*\forrester{#1}) + (#3 * (#1-0.5)) - #4)}
+\input{acronyms}
+
+\begin{document}
+\maketitle
+\section*{Problem Setup}
+\[y = z_\ell(\vct{x})  \quad \ell \in \{1, \dots, L\} \]
+\[y_\ell \approx f_\ell(\vct{x})\]
+\[\symcal{D}_\ell = \{(\xellind{\ell}{i}, \yellind{\ell}{i})\}^{I_\ell}_{i=1}\]
+\[
+	\mat{X}_\ell = \begin{bmatrix}
+		|                 & |                 & |     & |                      \\
+		\xellind{\ell}{1} & \xellind{\ell}{2} & \dots & \xellind{\ell}{I_\ell} \\
+		|                 & |                 & |     & |
+	\end{bmatrix} \quad
+	\vct{y}_\ell = \begin{bmatrix}
+		\yellind{\ell}{1} & \yellind{\ell}{2} & \dots & \yellind{\ell}{I_\ell}
+	\end{bmatrix}^T
+\]
+[Expand]
+\section*{Background}
+
+\[
+	\vct{\mu} = \mat{K}^*\left(\mat{X} + \sigma_n^2\mat{I}\right)^{-1}\vct{y}
+\]
+
+\subsection*{Assumptions}
+\begin{enumerate}
+	%\item Different codes are correlated in some way
+	\item The codes have a degree of smoothness
+	\item One cannot learn more about \(z_\ell(\vct{x})\) for any observation \(z_{\ell-1}(\vct{x}')\) given \(\vct{x} \ne \vct{x}'\). Formally, this is a kind if Markov property \(\text{cov}\{z_\ell(\vct{x}), z_{\ell - 1}(\vct{x})\} = 0\) which  is equivalent to stating that level models are independent. I think... \label{assumption:mkp}
+\end{enumerate}
+
+\subsection*{Linearity}
+\[f_1 \sim \symcal{GP}(m_1, k_1) \quad f_2 \sim \symcal{GP}(m_2, k_2)\]
+\[g(\vct{x}) = \alpha f_1(\vct{x}) + \beta f_2(\vct{x})\]
+\[g \sim \symcal{GP}(\alpha m_1 + \beta m_2, \alpha^2k_1 + \beta^2k_2)\]
+
+\section*{Cannonical Example}
+\subsection*{Introduction}
+In multi-fidelity it is common to combine sources of information using a multi-fidelity \ac{gp} defined by an autoregressive scheme first introduced by Kennedy and O'Hagan [?]. In this scheme, sources are arranged in a hierarchy in which successive levels of fidelities are \acp{gp} such that
+\[
+	f_\ell = \varrho_{\ell-1} f_{\ell-1} + \delta_\ell \quad \ell \in \{2. \dots, L\}
+\]
+where factors \(\vct{\varrho}\) scales successive representations of \(f\) and \(\delta_\ell\) models the discrepancy between \(f_\ell\) and the scaled model \(\varrho_{\ell-1}f_{\ell-1}\)  as a \ac{gp} with mean and covariance functions \(m\) and \(k\)
+\[\delta_\ell \sim \symcal{GP}(m_{\delta_\ell}, k_{\delta_\ell})\]
+Graphically this may be represented as
+
+\begin{figure}[H]
+	\centering
+	\begin{tikzpicture}
+		\GraphInit[vstyle=Classic]
+		\SetGraphUnit{2}
+		%\draw[help lines] (0,0) grid (9,2);
+		\Vertex[x=0,y=0,Lpos=-90,L={$f_1$}]{f1}
+		\Vertex[x=3,y=0,Lpos=-90,L={$f_2$}]{f2}
+		\Vertex[x=6,y=0,Lpos=-90,L={$f_3$}]{f3}
+		\Vertex[x=9,y=0,Lpos=-90,L={$f_{L-1}$}]{flm1}
+		\Vertex[x=12,y=0,Lpos=-90,L={$f_L$}]{fl}
+		\Edge[label={$\varrho_1 \delta_2$}](f1)(f2)
+		\Edge[label={$\varrho_2 \delta_3$}](f2)(f3)
+		\node at (7.5,0) {$\dots$};
+		\Edge[label={$\varrho_{L-1} \delta_L$}](flm1)(fl)
+	\end{tikzpicture}
+	\caption{A graphical representation of the autoregressive scheme presented by [cite]}
+\end{figure}
+
+\subsection*{Cross-fidelity Correlation}
+The correlation \(k_{qr}\) between two inputs \(x_q\) and \(x_r\) from \(\symcal{D}_q\) and \(\symcal{D}_r\) is dependent on \(q\) and \(r\) as information from intermediate sources influences \(k\).
+
+\begin{figure}[H]
+	\centering
+	\begin{tikzpicture}
+		\begin{axis}[
+				width=4.8in,
+				height=3.2in,
+				xmax=1,
+				axis lines=middle,
+				enlargelimits,
+				axis line style={shorten >=-0.25cm,shorten <=-0.25cm,latex-latex},
+				ticklabel style={fill=white},
+				xlabel=$x$,
+				ylabel=$y$,
+				clip=false,
+				xtick={0.575,0.85},
+				xticklabels={$\vct{x}'$, $\vct{x}$},
+				axis x line=bottom,
+			]
+
+			\addplot[
+				domain=0:1,
+				samples=200,
+				thick,
+				blue
+			]{\forrester{x}};
+
+			\addplot[
+				domain=0:1,
+				samples=200,
+				thick,
+				red
+			]{\mfforrester{x}{0.5}{10}{-5}};
+
+			\pgfmathsetmacro{\xone}{0.85}
+			\pgfmathsetmacro{\xtwo}{0.575}
+
+			\pgfmathsetmacro{\yone}{\forrester{\xone}}
+			\pgfmathsetmacro{\ytwo}{\mfforrester{\xone}{0.5}{10}{-5}}
+			\pgfmathsetmacro{\ythree}{\forrester{\xtwo}}
+			\pgfmathsetmacro{\yfour}{\mfforrester{\xtwo}{0.5}{10}{-5}}
+
+			\draw[dotted, thick]
+			(axis cs:\xone,\yfour) --
+			(axis cs:\xtwo,\yfour)
+			node[midway, below, yshift=1.8em] {$k_{\delta_2}$} --
+			(axis cs:\xtwo,\yone)
+			node[midway, right] {$\varrho_1$} --
+			(axis cs:\xone,\yone)
+			node[midway, above] {$k_1$} --
+			cycle
+			node[midway, left] {$\varrho_1$};
+
+			% --- Add black cross markers ---
+			\addplot[
+				only marks,
+				mark=x,
+				mark size=3pt,
+				thick,
+				black
+			] coordinates {
+					(\xone, \yone)
+					(\xtwo, \yfour)
+				};
+		\end{axis}
+	\end{tikzpicture}
+	\caption{Cross-fidelity correlation on the multi-fidelity Forrester function}
+	\label{fig:mfcorr}
+\end{figure}
+
+In the two-fidelity case presented in Figure \ref{fig:mfcorr} we consider the cross-fidelity covariance between \(\vct{x}_1\) and \(\vct{x}_2'\) is
+\[
+	k_{21}(\vct{x}, \vct{x}')  =  k_{\delta_2}(\vct{x}, \vct{x}') + \varrho_1^2 k_{1}(\vct{x}, \vct{x}')
+\]
+\[
+	k_\ell = \sum^L_{i=1} M_{\ell i} K_{\delta_i}
+\]
+
+\subsection*{Joint Distribution}
+The linearity of \ac{gp} addition allows us to write us to express the joint distribution relating all \(\symcal{D}_\ell\) analytically.
+\begingroup
+\renewcommand*{\arraystretch}{1.5}
+\[
+	\begin{bmatrix}
+		\vct{y}_1 \\
+		\vct{y}_2 \\
+		\vdots    \\
+		\vct{y}_L
+	\end{bmatrix} \sim
+	\symcal{N}\left(
+	\begin{bmatrix}
+			\vct{m}_1 \\
+			\vct{m}_2 \\
+			\vdots    \\
+			\vct{m}_3
+		\end{bmatrix} ,
+	\begin{bmatrix}
+			\mat{K}_{11} & \mat{K}_{12} & \dots  & \mat{K}_{1L} \\
+			\mat{K}_{21} & \mat{K}_{22} & \dots  & \mat{K}_{2L} \\
+			\vdots       & \vdots       & \ddots & \vdots       \\
+			\mat{K}_{L1} & \mat{K}_{L2} & \dots  & \mat{K}_{LL} \\
+		\end{bmatrix}
+	\right)
+\]
+\endgroup
+where \(\vct{m}_\ell\) is the vector of mean function values generated when \(m_\ell\) is applied to each \(\vct{x}\) in \(\mat{X}_\ell\) and \(\mat{K}_{qr}\) is the matrix of covariances generated by evaluating \(k_{qr}(\vct{x},\vct{x}')\) for each pair of points \((\vct{x}, \vct{x}')\) in \(X_q\) and \(X_r\)
+
+[Rehome and rework this]
+\[
+	\vct{m} = \mat{M}\vct{m}_\delta \quad \vct{k} = \mat{N}\vct{k}_\delta  \]
+In our cannonical example \(\mat{M}\) and \(\mat{N}\) are
+\[
+	M_{ij} = \prod^{i-1}_{d=j} \varrho_d \quad
+	N_{ij} = \prod^{i-1}_{d=j} \varrho_d^2
+\]
+\begingroup
+\renewcommand*{\arraystretch}{1.5}
+\[
+	\begin{bmatrix}
+		m_1    \\
+		m_2    \\
+		m_3    \\
+		\vdots \\
+		m_L
+	\end{bmatrix} = \begin{bmatrix}
+		1                  & 0         & 0      & \dots  & 0 \\
+		\varrho_1          & 1         & 0      & \dots  & 0 \\
+		\varrho_2\varrho_1 & \varrho_2 & 1      & \dots  & 0 \\
+		\vdots             & \vdots    & \vdots & \ddots & 0 \\
+		M_{L1}             & M_{L2}    & M_{L3} & \dots  & 1
+	\end{bmatrix}
+	\begin{bmatrix}
+		m_1          \\
+		m_{\delta_2} \\
+		m_{\delta_3} \\
+		\vdots       \\
+		m_{\delta_L}
+	\end{bmatrix}
+	\qquad
+	\begin{bmatrix}
+		k_1    \\
+		k_2    \\
+		k_3    \\
+		\vdots \\
+		k_L
+	\end{bmatrix} = \begin{bmatrix}
+		1                       & 0           & 0      & \dots  & 0 \\
+		\varrho_1^2             & 1           & 0      & \dots  & 0 \\
+		\varrho_2^2 \varrho_1^2 & \varrho_2^2 & 1      & \dots  & 0 \\
+		\vdots                  & \vdots      & \vdots & \ddots & 0 \\
+		N_{L1}                  & N_{L2}      & M_{L3} & \dots  & 1
+	\end{bmatrix}
+	\begin{bmatrix}
+		k_{1}        \\
+		k_{\delta_2} \\
+		k_{\delta_3} \\
+		\vdots       \\
+		k_{\delta_L}
+	\end{bmatrix}
+\]
+\endgroup
+
+\section*{Counter Example}
+In multi-physics modelling it is not always possible to arrange sources in such a strict hierarchy. Additional sources may act to add unrelated complexity. In a sense the information gained by two such models is orthogonal, as the knowledge gain by one has no bearing on the knowledge gained by the other. In this case it is dishonest to arrange the models as proposed in the canonical example. In this context I proposed a different multi-fidelity scheme.
+
+\[
+	f_1 \sim \symcal{GP}(m_1,k_1)
+\]
+\[
+	f_\ell \sim \symcal{GP}(\varrho_{1\ell} m_1 + m_{\delta_{1\ell}}, \varrho_{1\ell}^2 k_1 + k_{\delta_{1\ell}})  \quad \ell \in \{2, ..., L - 1\}
+\]
+\[
+	f_L \sim \symcal{GP}\left(
+	\sum^{L-1}_{ell=2} \varrho_{\ell L}\varrho_{1 \ell} m_1 + \varrho_{\ell L} m_{\delta_{1\ell}} + m_{\ell L},
+	\sum^{L-1}_{\ell=2} \varrho^2_{\ell L}\varrho^2_{1 \ell} k_1 + \varrho^2_{\ell L} k_{\delta_{1\ell}} + k_{\ell L}
+	\right)
+\]
+
+Where \(\varrho_{qr}\) is the weight scaling \(f_q\) for use in defining \(f_r\), and \(\delta_{qr}\) is the discrepancy between the weighted distribution \(\varrho_{qr}f_q\) and \(f_r\).
+
+This scheme models a system where source is improved in unique orthogonal senses by \(L-2\) additional sources, which are all captured by a single high fidelity source. Visually this may be represented as
+\begin{figure}[H]
+	\centering
+	\begin{tikzpicture}
+		\GraphInit[vstyle=Classic]
+		\SetGraphUnit{2}
+		%\draw[help lines] (0,0) grid (9,2);
+		\Vertex[x=0,y=0,Lpos=-90,L={$f_1$}]{f1}
+		\Vertex[x=4.5,y=3,Lpos=-90,L={$f_2$}]{f2}
+		\Vertex[x=4.5,y=1,Lpos=-90,L={$f_3$}]{f3}
+		\Vertex[x=4.5,y=-1,Lpos=-90,L={$f_4$}]{f4}
+		\Vertex[x=4.5,y=-3,Lpos=-90,L={$f_{L-1}$}]{flm1}
+		\Vertex[x=9,y=0,Lpos=-90,L={$f_L$}]{fl}
+		\node at (4.5,-2.2) {$\vdots$};
+		\Edge[label={$\varrho_{12} \delta_{12} $}](f1)(f2)
+		\Edge[label={$\varrho_{13} \delta_{13} $}](f1)(f3)
+		\Edge[label={$\varrho_{14} \delta_{14} $}](f1)(f4)
+		\Edge[label={$\varrho_{1L} \delta_{1L-1} $}](f1)(flm1)
+		\Edge[label={$\varrho_{2L} \delta_{2L} $}](f2)(fl)
+		\Edge[label={$\varrho_{3L} \delta_{3L} $}](f3)(fl)
+		\Edge[label={$\varrho_{4L} \delta_{4L} $}](f4)(fl)
+		\Edge[label={$\varrho_{L-1L} \delta_{L-1L} $}](flm1)(fl)
+	\end{tikzpicture}
+	\caption{An alternate multi-fidelity scheme}
+\end{figure}
+
+The system mapping the means and covariance functions is
+\begingroup
+\renewcommand*{\arraystretch}{1.5}
+\[
+	\begin{bmatrix}
+		m_1     \\
+		m_2     \\
+		m_3     \\
+		\vdots  \\
+		m_{L-1} \\
+		m_{L}
+	\end{bmatrix} = \begin{bmatrix}
+		1                                                   & 0            & 0            & \cdots & 0              & 0      & \cdots & 0      \\
+		\varrho_{12}                                        & 1            & 0            & \cdots & 0              & 0      & \cdots & 0      \\
+		\varrho_{13}                                        & 0            & 1            & \cdots & 0              & 0      & \cdots & 0      \\
+		\vdots                                              & \vdots       & \vdots       & \ddots & \vdots         & \vdots & \ddots & \vdots \\
+		\varrho_{1L-1}                                      & 0            & 0            & 0      & 1              & 0      & \cdots & 0      \\
+		\sum^{L-1}_{\ell=2} \varrho_{1\ell}\varrho_{\ell L} & \varrho_{2L} & \varrho_{3L} & \cdots & \varrho_{L-1L} & 1      & \cdots & 1      \\
+	\end{bmatrix}
+	\begin{bmatrix}
+		m_{1}             \\
+		m_{\delta_{12}}   \\
+		m_{\delta_{13}}   \\
+		\vdots            \\
+		m_{\delta_{1L-1}} \\
+		m_{\delta_{2L}}   \\
+		\vdots            \\
+		m_{\delta_{L-1L}} \\
+	\end{bmatrix}
+\]
+\[
+	\begin{bmatrix}
+		k_1     \\
+		k_2     \\
+		k_3     \\
+		\vdots  \\
+		k_{L-1} \\
+		k_{L}
+	\end{bmatrix} = \begin{bmatrix}
+		1                                                       & 0              & 0              & \cdots & 0                & 0      & \cdots & 0      \\
+		\varrho^2_{12}                                          & 1              & 0              & \ddots & 0                & 0      & \cdots & 0      \\
+		\varrho^2_{13}                                          & 0              & 1              & \ddots & 0                & 0      & \cdots & 0      \\
+		\vdots                                                  & \vdots         & \ddots         & \ddots & \vdots           & \vdots & \ddots & \vdots \\
+		\varrho^2_{1L-1}                                        & 0              & \cdots         & 0      & 1                & 0      & \cdots & 0      \\
+		\sum^{L-1}_{\ell=2} \varrho^2_{1\ell}\varrho^2_{\ell L} & \varrho^2_{2L} & \varrho^2_{3L} & \cdots & \varrho^2_{L-1L} & 1      & \cdots & 1      \\
+	\end{bmatrix}
+	\begin{bmatrix}
+		k_{1}             \\
+		k_{\delta_{12}}   \\
+		k_{\delta_{13}}   \\
+		\vdots            \\
+		k_{\delta_{1L-1}} \\
+		k_{\delta_{2L}}   \\
+		\vdots            \\
+		k_{\delta_{L-1L}} \\
+	\end{bmatrix}
+\]
+\endgroup
+\section*{Generalised Case}
+The linearity property implies that any such hierarchy represented as a directed acyclic graph defines a \ac{gp} with a mean and covariance functions that capture the hierarchical relationship between sources in the graph.
+\end{document}
