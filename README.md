@@ -1,7 +1,7 @@
 # xabo
 
 <p align="center">
-<img src="resources/icon.png" width="160"/><a/>
+<img src="resources/icon.png" height="160"/><a/>
 </p>
 
 Context aware machine learning in python
