@@ -1,8 +1,7 @@
 import jax.numpy as np
 from beartype import beartype
 
-from xabo.core.typing import typecheck
-
+from ..typing import typecheck
 from ._kernel import Kernel
 from ._types import KernelInputA, KernelInputB, KernelOutput
 
@@ -13,7 +12,11 @@ class SquaredExponential(Kernel):
     ell: float
     sigma: float
 
-    def __init__(self, lengthscale: float, variance: float) -> None:
+    def __init__(
+        self: 'SquaredExponential',
+        lengthscale: float,
+        variance: float,
+    ) -> None:
         self.ell = lengthscale
         self.sigma = variance
 

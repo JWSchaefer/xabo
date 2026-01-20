@@ -27,15 +27,15 @@ dev = [
 ]
 
 [tool.xabo]
-# runtime_typechecking = true
+runtime_typechecking = true
 
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/xabo"]
 
 [tool.pytest]
-addopts = ["-ra", "-rP"]
-#testpaths = ["tests"]
+addopts = ["-s", "-ra", "-rP"]
+testpaths = ["tests"]
 
 [tool.ruff]
 
