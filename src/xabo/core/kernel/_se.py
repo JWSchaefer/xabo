@@ -1,5 +1,6 @@
 import jax.numpy as np
 from beartype import beartype
+from jaxtyping import Float
 
 from ..typing import typecheck
 from ._kernel import Kernel
@@ -9,14 +10,14 @@ from ._types import KernelInputA, KernelInputB, KernelOutput
 @beartype
 class SquaredExponential(Kernel):
 
-    ell: float
-    sigma: float
+    ell: float | Float[np.ndarray, '...']
+    sigma: float | Float[np.ndarray, '...']
 
     def __init__(
         self: 'SquaredExponential',
-        lengthscale: float,
-        variance: float,
-    ) -> None:
+        lengthscale: float | Float[np.ndarray, '...'],
+        variance: float | Float[np.ndarray, '...'],
+    ):
         self.ell = lengthscale
         self.sigma = variance
 

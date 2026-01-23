@@ -2,8 +2,8 @@ import jax.numpy as np
 import pytest
 
 from xabo.core.gp import ExactGP
-from xabo.core.kernel import Kernel, SquaredExponential
-from xabo.core.mean import Mean, ZeroMean
+from xabo.core.kernel import Kernel
+from xabo.core.mean import Mean
 
 from ..shared import kernel_id, kernels, mean_id, means
 
@@ -17,7 +17,7 @@ def test_constructor(mean: Mean, kernel: Kernel):
 @pytest.mark.parametrize('mean', means, ids=mean_id)
 @pytest.mark.parametrize('kernel', kernels, ids=kernel_id)
 def test_train(mean: Mean, kernel: Kernel):
-    gp = ExactGP(mean, kernel, 1e-6)
+    gp = ExactGP(mean, kernel, 1e-3)
     x = np.linspace(0, 1, 100)[:, None]
     y = np.zeros_like(x)
     gp.train(x, y)
@@ -45,3 +45,24 @@ def test_access_incorrect(mean: Mean, kernel: Kernel):
         _ = gp.y
     with pytest.raises(AttributeError):
         _ = gp.lower
+    with pytest.raises(AttributeError):
+        _ = gp.alphas
+
+
+@pytest.mark.parametrize('mean', means, ids=mean_id)
+@pytest.mark.parametrize('kernel', kernels, ids=kernel_id)
+def test_call_correct(mean: Mean, kernel: Kernel):
+    gp = ExactGP(mean, kernel, 1e-6)
+    x = np.linspace(0, 1, 100)[:, None]
+    y = np.zeros_like(x)
+    gp.train(x, y)
+    gp(x[:4])
+
+
+@pytest.mark.parametrize('mean', means, ids=mean_id)
+@pytest.mark.parametrize('kernel', kernels, ids=kernel_id)
+def test_call_incorrect(mean: Mean, kernel: Kernel):
+    gp = ExactGP(mean, kernel, 1e-6)
+    x = np.linspace(0, 1, 100)[:, None]
+    with pytest.raises(AttributeError):
+        gp(x)

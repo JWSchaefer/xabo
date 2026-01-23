@@ -1,20 +1,22 @@
 from functools import wraps
-from typing import Callable, TypeVar
 
-from xabo.core.model._model import Model
+from beartype.typing import Callable, Concatenate, ParamSpec, TypeVar
 
-S = TypeVar('S', bound=Model)
+from ._model import Model
+
 T = TypeVar('T')
+P = ParamSpec('P')
+M = TypeVar('M', bound=Model)
 
 
-def trained_property(
-    name: str,
-) -> Callable[[Callable[[S], T]], property]:
-    def decorator(method: Callable[[S], T]) -> property:
+def trained_property(name: str):
+    N = TypeVar('N', bound=Model)
+
+    def decorator(method: Callable[[N], T]) -> property:
         private_name = '_' + name
 
         @wraps(method)
-        def getter(self: S) -> T:
+        def getter(self: N) -> T:
             if not self.is_trained:
                 raise AttributeError(
                     f'Attempted to access training-dependent variable `{name}` '
@@ -35,16 +37,17 @@ def trained_property(
     return decorator
 
 
-def trained_function(method: Callable[[S], T]) -> Callable[[S], T]:
+def trained_function(
+    method: Callable[Concatenate[M, P], T]
+) -> Callable[Concatenate[M, P], T]:
     @wraps(method)
-    def wrapper(self: S) -> T:
-
+    def wrapper(self: M, *args: P.args, **kwargs: P.kwargs) -> T:
         if not self.is_trained:
             raise AttributeError(
-                'Attempted to call training-dependent function. '
-                + 'before training. Try training the model first.'
+                'Attempted to call training-dependent function '
+                'before training. Try training the model first.'
             )
 
-        return method(self)
+        return method(self, *args, **kwargs)
 
     return wrapper

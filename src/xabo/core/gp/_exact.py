@@ -1,9 +1,8 @@
-from typing import Any, Optional
-
 import jax.numpy as np
 import jax.scipy as scipy
 from beartype import beartype
-from jaxtyping import Array
+from beartype.typing import Optional, Tuple
+from jaxtyping import Array, Float
 
 from ..kernel._kernel import Kernel
 from ..mean._mean import Mean
@@ -14,6 +13,7 @@ from ._types import (
     LowerDecomposition,
     TestFeatures,
     TestPredictions,
+    TestVariance,
     TrainingFeatures,
     TrainingObservations,
 )
@@ -24,18 +24,20 @@ class ExactGP(Model):
 
     m: Mean
     k: Kernel
-    sigma_n: float
+    sigma_n: float | np.ndarray
 
     _x: Optional[TrainingFeatures]
     _y: Optional[TrainingObservations]
+
     _lower: Optional[LowerDecomposition]
+    _alphas: Optional[TrainingObservations]
 
     @typecheck
     def __init__(
         self: 'ExactGP',
         mean: Mean,
         kernel: Kernel,
-        measurement_noise: float,
+        measurement_noise: float | np.ndarray,
     ):
         super().__init__()
         self.m = mean
@@ -48,22 +50,44 @@ class ExactGP(Model):
         self._alphas = None
 
     @typecheck
-    def __call__(self: 'ExactGP', x: TestFeatures) -> TestPredictions:
-        ...
+    @trained_function
+    def __call__(
+        self: 'ExactGP', x_test: TestFeatures
+    ) -> Tuple[TestPredictions, TestVariance]:
+
+        k_star = self.k(self.x, x_test)
+        mu = k_star.T @ self.alphas
+        v = scipy.linalg.solve(self.lower, k_star, lower=True)
+        var_diag = np.diag(self.k(x_test, x_test)) - np.sum(v**2, axis=0)
+        return (mu, var_diag[:, None])
 
     @typecheck
-    def train(self: 'ExactGP', x: TrainingFeatures, y: TrainingObservations):
+    def train(
+        self: 'ExactGP',
+        x: TrainingFeatures,
+        y: TrainingObservations,
+        jitter: Optional[float] = None,
+    ):
+        if jitter is None:
+            if x.dtype == np.float64:
+                jitter = 1e-12
+            elif x.dtype == np.float32:
+                jitter = 1e-7
+            elif x.dtype == np.float16:
+                jitter = 1e-4
+            else:
+                raise ValueError(
+                    f'Unable to automatically assign jitter for {x.dtype}. Please provide an value explicitly using the `jitter : float` kwarg.',
+                )
 
-        k = self.k(x, x)
+        k = self.k(x, x) + (self.sigma_n**2 + jitter) * np.eye(x.shape[-2])
 
-        (lower, _) = scipy.linalg.cho_factor(
-            k + self.sigma_n * np.eye(k.shape[-1]),
-            True,
-        )
+        lower = scipy.linalg.cholesky(k, lower=True)
 
-        alphas = np.linalg.solve(
+        alphas = scipy.linalg.solve(
             lower.T,
-            np.linalg.solve(lower, y),
+            scipy.linalg.solve(lower, y, lower=True),
+            lower=False,
         )
 
         self._x = x
@@ -73,9 +97,14 @@ class ExactGP(Model):
 
         self.set_trained()
 
-    @trained_property('lower')
-    def lower(self) -> Optional[Array]:
-        return self._lower
+    @typecheck
+    @trained_function
+    def log_marginal_liklihood(self: 'ExactGP') -> Float[Array, '']:
+        return (
+            -(1 / 2) * self.y.T @ self.alphas
+            - np.sum(np.log(np.diag(self.lower)))
+            - (self.lower.shape[-1] / 2) * np.log(2 * np.pi)
+        ).squeeze()
 
     @trained_property('y')
     def y(self) -> Optional[Array]:
@@ -84,3 +113,11 @@ class ExactGP(Model):
     @trained_property('x')
     def x(self) -> Optional[Array]:
         return self._x
+
+    @trained_property('lower')
+    def lower(self) -> Optional[Array]:
+        return self._lower
+
+    @trained_property('alphas')
+    def alphas(self) -> Optional[Array]:
+        return self._alphas

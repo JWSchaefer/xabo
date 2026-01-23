@@ -1,25 +1,21 @@
-from abc import abstractmethod
-from typing import Generic, List, Self, TypeVar
+from abc import ABC, abstractmethod
+
+from beartype.typing import Self, TypeVar
+from jax import Array
+
+from ..parameters import Parameter
 
 T = TypeVar('T')
 
 
-class Constraint:
-    pass
+class Prior(Parameter[T], ABC):
 
-
-class Prior(Generic[T]):
-
-    constrains: List[Constraint]
+    _rng: Array
 
     @abstractmethod
-    def sample(self: Self) -> T:
+    def sample(self: Self) -> None:
         ...
 
     @abstractmethod
     def log_prob(self: Self) -> float:
-        ...
-
-    @property
-    def value(self: Self) -> T:
         ...
