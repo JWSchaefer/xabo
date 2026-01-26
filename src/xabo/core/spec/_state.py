@@ -1,7 +1,9 @@
-from typing import Generic, TypeVar
+from typing import TypeVar
+
+from ._parameter import Default
 
 T = TypeVar('T')
 
 
-class State(Generic[T]):
+class State(Default[T]):
     pass

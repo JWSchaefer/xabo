@@ -1,18 +1,32 @@
-from typing import Type, TypeVar, get_args, get_origin, get_type_hints
+from typing import (
+    Optional,
+    Type,
+    TypeVar,
+    get_args,
+    get_origin,
+    get_type_hints,
+)
+
+from jax import Array
 
 from ._parameter import Parameter
+from ._state import State
 
 
 class Spec:
     @classmethod
-    def to_param_structure(cls, *, rng=None):
+    def to_spec(cls: Type['Spec']) -> dict:
         return {
-            name: cls._param_from_annotation(ann)
+            name: cls._from_annotation(ann)
             for name, ann in get_type_hints(cls).items()
         }
 
     @classmethod
-    def to_param_structure_from_args(cls, args):
+    def to_params(cls: Type['Spec'], rng: Optional[Array]):
+        return {i for i in cls.to_spec()}
+
+    @classmethod
+    def to_structure_from_args(cls, args):
         type_vars = getattr(cls, '__parameters__', ())
         tv_map: dict[TypeVar, Type] = dict(zip(type_vars, args))
 
@@ -31,19 +45,19 @@ class Spec:
         }
 
         return {
-            name: cls._param_from_annotation(ann)
+            name: cls._from_annotation(ann)
             for name, ann in resolved_hints.items()
         }
 
     @classmethod
-    def _param_from_annotation(cls, ann):
+    def _from_annotation(cls, ann):
         origin = get_origin(ann) or ann
         args = get_args(ann)
 
-        if isinstance(origin, type) and issubclass(origin, Parameter):
-            return args
+        if isinstance(origin, type) and issubclass(origin, (Parameter, State)):
+            return origin
 
         if isinstance(origin, type) and issubclass(origin, Spec):
-            return origin.to_param_structure_from_args(args)
+            return origin.to_structure_from_args(args)
 
         raise TypeError(f'Unsupported annotation {ann}')

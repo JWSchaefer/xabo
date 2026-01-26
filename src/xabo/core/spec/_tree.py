@@ -11,7 +11,6 @@ class Tree:
 
     @classmethod
     def from_dict(cls, d: dict):
-        # Sort keys for determinism
         keys = tuple(d.keys())
         values = tuple(
             cls.from_dict(v) if isinstance(v, dict) else v for v in d.values()

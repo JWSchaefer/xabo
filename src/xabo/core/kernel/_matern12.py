@@ -14,8 +14,8 @@ from ._types import KernelInputA, KernelInputB, KernelOutput, R, S
 @beartype
 class Matern12(Kernel, Generic[R, S]):
 
-    rho: R
-    sigma: S
+    rho: Parameter[R]
+    sigma: Parameter[S]
 
     @typecheck
     def __call__(
