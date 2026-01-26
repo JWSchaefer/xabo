@@ -4,6 +4,7 @@ import jax.numpy as np
 from beartype import beartype
 from jaxtyping import PyTree
 
+from xabo.core.spec._parameter import Parameter
 from xabo.core.typing import typecheck
 
 from ._kernel import Kernel

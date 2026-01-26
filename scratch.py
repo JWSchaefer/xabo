@@ -1,25 +1,28 @@
-from typing import TypeAlias
+from typing import Type
 
+from jax.tree_util import tree_leaves
 from jaxtyping import Array, Float
 
-from xabo.core.gp._exact import ExactGP
-from xabo.core.kernel import Kernel
-from xabo.core.parameters import Parameter
-from xabo.core.priors import Prior
-
-TrainingFeatures: TypeAlias = Float[Array, '*S N X']
-LengthscaleShape: TypeAlias = Float[Array, 'N']
+from xabo.core.kernel import Matern12
+from xabo.core.spec._parameter import Parameter
+from xabo.core.spec._spec import Spec
 
 
-class MyKernel(Kernel, Trainable):
-    ell: Parameter[LengthscaleShape] | Prior[LengthscaleShape]
-    ...
+class Scalar(Parameter[float]):
+    @classmethod
+    def default(cls: Type['Scalar'], rng=None) -> float:
+        return 0.0
 
 
-class MyGP(ExactGP, Trainable):
-    kernel: Kernel
-    ...
+class MyModel(Spec):
+    kernel: Matern12[Scalar, Scalar]
+    other: Parameter[Float[Array, '2']]
 
 
-def main():
-    gp = MyGP(kernel=MyKernel(ell=MyPrior(loc=[...], scale=[...])))
+if __name__ == '__main__':
+
+    # state = MyModel.to_state()
+    params = MyModel.to_param_structure()
+    print(params)
+    print(tree_leaves(params))
+    # print(params, state)

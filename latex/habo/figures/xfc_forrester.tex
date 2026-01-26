@@ -1,0 +1,69 @@
+\begin{figure}[H]
+	\centering
+	\begin{tikzpicture}
+		\begin{axis}[
+				width=4.8in,
+				height=3.2in,
+				xmax=1,
+				axis lines=middle,
+				enlargelimits,
+				axis line style={shorten >=-0.25cm,shorten <=-0.25cm,latex-latex},
+				ticklabel style={fill=white},
+				xlabel=$$,
+				ylabel=$y$,
+				clip=false,
+				xtick={0.575,0.85},
+				xticklabels={$\vct{x}$, $\vct{x}'$},
+				axis x line=bottom,
+			]
+
+			\addplot[
+				domain=0:1,
+				samples=200,
+				thick,
+				blue
+			]{\forrester{x}};
+
+			\addplot[
+				domain=0:1,
+				samples=200,
+				thick,
+				red
+			]{\mfforrester{x}{0.5}{10}{-5}};
+
+			\pgfmathsetmacro{\xone}{0.85}
+			\pgfmathsetmacro{\xtwo}{0.575}
+
+			\pgfmathsetmacro{\yone}{\forrester{\xone}}
+			\pgfmathsetmacro{\ytwo}{\mfforrester{\xone}{0.5}{10}{-5}}
+			\pgfmathsetmacro{\ythree}{\forrester{\xtwo}}
+			\pgfmathsetmacro{\yfour}{\mfforrester{\xtwo}{0.5}{10}{-5}}
+
+			\draw[dotted, thick]
+			(axis cs:\xone,\yfour) --
+			(axis cs:\xtwo,\yfour)
+			node[midway, below, yshift=1.8em] {$k_{\delta_\ell}$} --
+			(axis cs:\xtwo,\yone)
+			node[midway, right] {$\varrho_{\ell-1}$} --
+			(axis cs:\xone,\yone)
+			node[midway, above] {$k_{\delta_{\ell-1}}$} --
+			cycle
+			node[midway, left] {$\varrho_{\ell-1}$};
+
+			% --- Add black cross markers ---
+			\addplot[
+				only marks,
+				mark=x,
+				mark size=3pt,
+				thick,
+				black
+			] coordinates {
+					(\xone, \yone)
+					(\xtwo, \yfour)
+				};
+		\end{axis}
+	\end{tikzpicture}
+	\caption{A visual depiction of the correlation between two observations of adjacent fidelity.}
+	\label{fig:mfcorr}
+\end{figure}
+

@@ -1,11 +1,7 @@
-from typing import Generic, Type, TypeVar
+from typing import Generic, TypeVar
 
-from xabo.core.spec._default import Default
-
-T = TypeVar('T', bound=Default)
+T = TypeVar('T')
 
 
 class State(Generic[T]):
-    @classmethod
-    def default(cls: Type['State[T]'], rng=None) -> T:
-        return cls.default(rng=rng)
+    pass

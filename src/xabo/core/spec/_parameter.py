@@ -1,6 +1,4 @@
-from typing import Generic, Type, TypeVar
-
-from xabo.core.spec._default import Default
+from typing import Generic, TypeVar
 
 T = TypeVar('T')
 
@@ -13,6 +11,6 @@ class Prior(Generic[T]):
     pass
 
 
-class Parameter(Default[T]):
+class Parameter(Generic[T]):
     transform: Transform[T]
     prior: Prior[T]
