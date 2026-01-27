@@ -1,55 +1,36 @@
 from __future__ import annotations
 
-from dataclasses import dataclass, replace
-from typing import TYPE_CHECKING, Any
+from dataclasses import dataclass, fields, replace
+from typing import TYPE_CHECKING, Any, Generic, TypeVar
 
 import jax
 import jax.numpy as jnp
 
 from xabo.core._types import Scalar
 
-from ._transform import Transform
+from ..transform import Transform
+from ._params_structure import ParamsStructure
 
 if TYPE_CHECKING:
     from ._spec import Spec
 
+P = TypeVar('P')
+S = TypeVar('S')
+
 
 @jax.tree_util.register_pytree_node_class
 @dataclass(frozen=True)
-class Model:
-    """Immutable container binding a Spec with params and state.
-
-    Model provides:
-    - Immutable parameter/state management via replace_*() methods
-    - Transform operations (to/from unconstrained space)
-    - Prior evaluation with Jacobian correction
-    - Delegation to spec's __call__ method
-
-    Usage:
-        spec = MySpec(kernel=Matern12(rho=0.5, sigma=1.0), noise=0.01)
-        model = Model.from_spec(spec)
-
-        # Transform for optimization
-        raw = model.to_unconstrained()
-
-        # Update from optimizer
-        model = model.from_unconstrained(new_raw_params)
-
-        # Evaluate prior (includes Jacobian correction)
-        lp = model.log_prior(raw_params)
-
-        # Call the underlying spec
-        result = model(x, y)
+class Model(Generic[P, S]):
+    """
+    Immutable container binding a Spec with typed params and state.
     """
 
-    spec: Spec
-    params: dict
-    state: dict
-
-    # --- Construction ---
+    spec: Spec[P, S]
+    params: P
+    state: S
 
     @classmethod
-    def from_spec(cls, spec: Spec) -> Model:
+    def from_spec(cls, spec: Spec[P, S]) -> Model[P, S]:
         """Create Model from an instantiated Spec."""
         return cls(
             spec=spec,
@@ -57,33 +38,112 @@ class Model:
             state=spec.init_state(),
         )
 
-    # --- Immutable Updates ---
-
-    def replace_params(self, params: dict) -> Model:
+    def replace_params(self, params: P) -> Model[P, S]:
         """Return new Model with updated params."""
         return replace(self, params=params)
 
-    def replace_state(self, state: dict) -> Model:
+    def replace_state(self, state: S) -> Model[P, S]:
         """Return new Model with updated state."""
         return replace(self, state=state)
+
+    # --- Flatten/Unflatten for external optimizers ---
+
+    def flatten_params(self) -> tuple[jnp.ndarray, ParamsStructure]:
+        """Flatten params to a 1D array for use with external optimizers.
+
+        Returns:
+            flat: 1D array containing all parameter values.
+            structure: Structure information needed for unflattening.
+
+        Example:
+            >>> flat, structure = model.flatten_params()
+            >>> # Use with scipy.optimize, custom optimizers, etc.
+            >>> result = scipy.optimize.minimize(loss_fn, flat, ...)
+            >>> new_model = model.unflatten_params(result.x, structure)
+        """
+        leaves, treedef = jax.tree_util.tree_flatten(self.params)
+
+        arrays = []
+        shapes = []
+        dtypes = []
+
+        for leaf in leaves:
+            arr = jnp.atleast_1d(jnp.asarray(leaf))
+            arrays.append(arr.ravel())
+            shapes.append(arr.shape)
+            dtypes.append(arr.dtype)
+
+        flat = jnp.concatenate(arrays) if arrays else jnp.array([])
+
+        structure = ParamsStructure(
+            treedef=treedef,
+            shapes=tuple(shapes),
+            dtypes=tuple(dtypes),
+        )
+
+        return flat, structure
+
+    def unflatten_params(
+        self, flat: jnp.ndarray, structure: ParamsStructure
+    ) -> Model[P, S]:
+        """Reconstruct Model with params from a 1D array.
+
+        Args:
+            flat: 1D array of parameter values.
+            structure: Structure information from flatten_params.
+
+        Returns:
+            New Model with reconstructed params.
+
+        Example:
+            >>> flat, structure = model.flatten_params()
+            >>> # Optimize flat array...
+            >>> new_model = model.unflatten_params(optimized_flat, structure)
+        """
+        leaves = []
+        offset = 0
+
+        for shape, dtype in zip(structure.shapes, structure.dtypes):
+            size = structure._prod(shape)
+            leaf_flat = flat[offset : offset + size]
+            leaf = leaf_flat.reshape(shape).astype(dtype)
+
+            # If original was scalar, extract it
+            if shape == (1,):
+                leaf = leaf[0]
+
+            leaves.append(leaf)
+            offset += size
+
+        params = jax.tree_util.tree_unflatten(structure.treedef, leaves)
+        return self.replace_params(params)
 
     # --- Transforms ---
 
     def to_unconstrained(self) -> dict:
-        """Transform current params to unconstrained space."""
+        """
+        Transform current params to unconstrained space.
+        Returns dict (not dataclass) for flexibility in optimization.
+        """
         transforms = self.spec._get_transforms()
-        return self._apply_transforms(self.params, transforms, inverse=True)
+        params_dict = self._dataclass_to_dict(self.params)
+        return self._apply_transforms_dict(
+            params_dict, transforms, inverse=True
+        )
 
-    def from_unconstrained(self, raw_params: dict) -> Model:
+    def from_unconstrained(self, raw_params: dict) -> Model[P, S]:
         """Return new Model with params transformed from unconstrained space."""
         transforms = self.spec._get_transforms()
-        constrained = self._apply_transforms(raw_params, transforms, inverse=False)
+        constrained_dict = self._apply_transforms_dict(
+            raw_params, transforms, inverse=False
+        )
+        constrained = self.spec._dict_to_params(constrained_dict)
         return self.replace_params(constrained)
 
-    def _apply_transforms(
+    def _apply_transforms_dict(
         self, params: dict, transforms: dict, inverse: bool
     ) -> dict:
-        """Apply transforms to params pytree."""
+        """Apply transforms to params dict."""
         result = {}
         for name, value in params.items():
             transform = transforms.get(name)
@@ -92,7 +152,9 @@ class Model:
                 result[name] = value
             elif isinstance(transform, dict):
                 # Nested spec - recurse
-                result[name] = self._apply_transforms(value, transform, inverse)
+                result[name] = self._apply_transforms_dict(
+                    value, transform, inverse
+                )
             elif isinstance(transform, Transform):
                 if inverse:
                     result[name] = transform.inverse(value)
@@ -103,25 +165,23 @@ class Model:
 
         return result
 
-    # --- Prior Evaluation ---
+    def _dataclass_to_dict(self, obj: Any) -> dict:
+        """Recursively convert dataclass to nested dict."""
+        result = {}
+        for f in fields(obj):
+            value = getattr(obj, f.name)
+            if hasattr(value, '__dataclass_fields__'):
+                result[f.name] = self._dataclass_to_dict(value)
+            else:
+                result[f.name] = value
+        return result
 
     def log_prior(self, unconstrained_params: dict) -> Scalar:
-        """Evaluate log prior with Jacobian correction.
-
-        For MCMC/optimization in unconstrained space:
-        log p(phi) = log p(f(phi)) + log|det J|
-
-        where f transforms unconstrained -> constrained.
-
-        Args:
-            unconstrained_params: Parameters in unconstrained space.
-
-        Returns:
-            Log prior density with Jacobian correction.
         """
-        # Transform to constrained space for prior evaluation
+        Evaluate log prior with Jacobian correction.
+        """
         transforms = self.spec._get_transforms()
-        constrained = self._apply_transforms(
+        constrained = self._apply_transforms_dict(
             unconstrained_params, transforms, inverse=False
         )
 
@@ -174,23 +234,14 @@ class Model:
     # --- Delegation ---
 
     def __call__(self, *args, **kwargs) -> Any:
-        """Delegate to spec's __call__ with current params and state."""
         if not callable(self.spec):
             raise TypeError(f'{type(self.spec).__name__} is not callable')
         return self.spec(self.state, self.params, *args, **kwargs)
 
-    # --- JAX Pytree Registration ---
-
     def tree_flatten(self):
-        """Flatten for JAX transformations.
-
-        params and state are dynamic (can be traced by JAX).
-        spec is static (defines structure, not traced).
-        """
-        return (self.params, self.state), self.spec
+        return self.params, self.state
 
     @classmethod
     def tree_unflatten(cls, spec, children):
-        """Unflatten from JAX transformations."""
         params, state = children
         return cls(spec=spec, params=params, state=state)

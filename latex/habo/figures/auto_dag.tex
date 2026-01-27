@@ -1,0 +1,20 @@
+\begin{figure}[H]
+	\centering
+	\begin{tikzpicture}
+		\GraphInit[vstyle=Classic]
+		\SetGraphUnit{2}
+		\tikzset{EdgeStyle/.style={->,>=latex}}
+		%\draw[help lines] (0,0) grid (9,2);
+		\Vertex[x=0,y=0,Lpos=-90,L={$f_1$}]{f1}
+		\Vertex[x=3,y=0,Lpos=-90,L={$f_2$}]{f2}
+		\Vertex[x=6,y=0,Lpos=-90,L={$f_3$}]{f3}
+		\Vertex[x=9,y=0,Lpos=-90,L={$f_{L-1}$}]{flm1}
+		\Vertex[x=12,y=0,Lpos=-90,L={$f_L$}]{fl}
+		\Edge[label={$\varrho_1 \delta_2$}](f1)(f2)
+		\Edge[label={$\varrho_2 \delta_3$}](f2)(f3)
+		\node at (7.5,0) {$\dots$};
+		\Edge[label={$\varrho_{L-1} \delta_L$}](flm1)(fl)
+	\end{tikzpicture}
+	\caption{The generalised \ac{dag} defining the model hierarchy of Kennedy and O'Hagan \cite{kennedyPredictingOutputComplex2000}}
+	\label{fig:armfgp}
+\end{figure}

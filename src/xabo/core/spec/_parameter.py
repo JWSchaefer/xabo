@@ -2,7 +2,7 @@ from typing import Generic, Optional, TypeVar
 
 from xabo.core.prior import Prior
 
-from ._transform import Transform
+from ..transform._transform import Transform
 
 T = TypeVar('T')
 

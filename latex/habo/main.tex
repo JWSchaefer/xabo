@@ -2,7 +2,7 @@
 \documentclass{article}
 \usepackage[top=2.5cm, bottom=2.5cm, left=3cm, right=3cm]{geometry}
 \usepackage{caption}
-\usepackage[sort&compress,numbers]{natbib}
+\usepackage[numbers]{natbib}
 \usepackage{bm}
 \usepackage{parskip}
 \usepackage{dirtytalk}
@@ -23,10 +23,6 @@
 \usepackage{caption}
 \usepackage{amsthm}
 \usepackage{calc}
-
-
-
-
 \usepackage{xcolor}
 \usepackage{listings}
 \usepackage{titlesec}
@@ -43,6 +39,7 @@
 
 \setmainfont{Charter}
 \setmathfont{LatinModern Math}
+%\setmathfont{XCharter-Math}
 %\setmathfont{XITS Math}
 \usetikzlibrary{calc}
 \usetikzlibrary{arrows}
@@ -80,7 +77,6 @@
 {1em}
 {\hspace{-0.4pt}}
 
-\bibliographystyle{bib}
 
 \title{\ImperialSansBold Hierarchy Aware Gaussian Processes\Huge}
 %\date{9\superscript{th} October 2025}
@@ -91,7 +87,8 @@
 	\end{tabular}
 }
 
-\pagenumbering{gobble}
+
+%\pagenumbering{gobble}
 
 % remove indentation
 \setlength{\parindent}{0pt}
@@ -99,23 +96,49 @@
 \newcommand{\xellind}[2]{{\vct{x}^{#1}_{#2}}}
 \newcommand{\yellind}[2]{{y^{#1}_{#2}}}
 
+
 \newcommand{\forrester}[1]{((6*(#1) - 2)^2 * sin(deg(12*(#1) - 4)))}
 \newcommand{\mfforrester}[4]{((#2*\forrester{#1}) + (#3 * (#1-0.5)) - #4)}
+
+\newcommand{\veryshortarrow}[1][3pt]{\mathrel{%
+   \hbox{\rule[\dimexpr\fontdimen22\textfont2-.2pt\relax]{#1}{.4pt}}%
+   \mkern-4mu\hbox{\usefont{U}{lasy}{m}{n}\symbol{41}}}}
+
+\makeatletter
+
+\setbox0\hbox{$\xdef\scriptratio{\strip@pt\dimexpr
+    \numexpr(\sf@size*65536)/\f@size sp}$}
+
+\newcommand{\scriptveryshortarrow}[1][3pt]{{%
+    \hbox{\rule[\scriptratio\dimexpr\fontdimen22\textfont2-.2pt\relax]
+               {\scriptratio\dimexpr#1\relax}{\scriptratio\dimexpr.4pt\relax}}%
+   \mkern-4mu\hbox{\let\f@size\sf@size\usefont{U}{lasy}{m}{n}\symbol{41}}}}
+
+\makeatother
+\newcommand{\direct}[3]{{#1_{#2 \,\scriptveryshortarrow #3}}}
+\newcommand{\wvct}[3]{{\direct{\vct{w}^{#1}}{#2}{#3}}}
+
 \input{acronyms}
 
 
 \newtheorem{theorem}{Theorem}
 \newtheorem{definition}{Definition}
 
+\bibliographystyle{IEEEtran}
+
 \begin{document}
 \maketitle
+\section*{Introduction}
+\textit{Thesis}\newline
+Fusion of information from different sources can be used to augment estimates of expensive sources using observations from cheaper sources.
+Existing approaches enable this by encoding model dependencies.
 
-\textit{Thesis}\newline Correlation across fidelities allows for fast estimates of expensive sources to be augmented using observations from cheaper sources. The continuum approximation provides a natural solution, but it forces some assumptions. The kennedy o'hagan apoach improves on this by encoding model dependencies.
+\textit{Antithesis}\newline
+Existing approaches assume a strict model hierarchy.
+Examples exist where this hierarchy breaks down.
 
-\textit{Antithesis}\newline Both approaches assume a linear model hierarchy. Instances exist where this hierarchy breaks down.
-
-\textit{Synthesis}\newline We can encode more sophisticated model hierarchies into the mean and kernel functions of GPs.
-%\section*{Multi-Fidelity Surrogate Modelling}
+\textit{Synthesis}\newline
+We can frame the problem as one of mean and kernel learning by encoding model hierarchies into the mean and covariance functions of a single analytically tractable GP with additional hyperparameters.
 
 \section*{Source Hierarchies}
 A source hierarchy \(H\) can be described as a \ac{dag} with a set of vertices \(V\) representing information sources, and edges \(E\) showing relationships in the accuracy of one source relative to the next, which may be known or assumed \textit{a priori}.
@@ -125,43 +148,15 @@ A source hierarchy \(H\) can be described as a \ac{dag} with a set of vertices \
 	E \subseteq V \times V \qquad
 	(u,v) \in E \Rightarrow u \rightarrow v
 \]
-Each \ac{dag} has a set of directed paths \(P\), each member of which is an ordered set of vertices in which adjacent vertices are connected by edges in \(E\). One may therefore pass from the first element \(u\) to the last element \(v\) by traversing the edges of the hierarchy.
+Each \ac{dag} has a set of directed paths \(P\), each member of which is an ordered set of edges in \(E\).
+One may traverse from the first vertex \(a\) to the last vertex \(d\) following the edges in order.
 \[
-	P = \{ (u, \dots, v) \given  \text{there exists a directed path from \(u\) to \(v\) in \(E\)} \} \qquad
-	(u, \dots, v) \in P \Rightarrow u \rightsquigarrow v
+	P = \{ \{(a,\,\cdot\,), \dots, (\,\cdot\,,d)\} \given (a,d) \in E^+ \}
 \]
-
-% \subsection*{Inference}
-% In the 
-% \begingroup
-% \renewcommand*{\arraystretch}{1.5}
-% \[
-% 	\begin{bmatrix}
-% 		\vct{y}_1 \\
-% 		\vct{y}_2 \\
-% 		\vdots    \\
-% 		\vct{y}_L
-% 	\end{bmatrix} \sim
-% 	\symcal{N}\left(
-% 	\begin{bmatrix}
-% 			\vct{m}_1 \\
-% 			\vct{m}_2 \\
-% 			\vdots    \\
-% 			\vct{m}_3
-% 		\end{bmatrix} ,
-% 	\begin{bmatrix}
-% 			\mat{K}_{11} & \mat{K}_{12} & \dots  & \mat{K}_{1L} \\
-% 			\mat{K}_{21} & \mat{K}_{22} & \dots  & \mat{K}_{2L} \\
-% 			\vdots       & \vdots       & \ddots & \vdots       \\
-% 			\mat{K}_{L1} & \mat{K}_{L2} & \dots  & \mat{K}_{LL} \\
-% 		\end{bmatrix}
-% 	\right)
-% \]
-% \endgroup
-% where \(\vct{m}_\ell\) is the vector of mean function values generated when \(m_\ell\) is applied to each \(\vct{x}\) in \(\mat{X}_\ell\) and \(\mat{K}_{qr}\) is the matrix of covariances generated by evaluating \(k_{qr}(\vct{x},\vct{x}')\) for each pair of points \((\vct{x}, \vct{x}')\) in \(X_q\) and \(X_r\)
+For a path \(Q\) in \(P\) there exists a set of sub-paths \(R\) joining each of the vertices that constitute the edges in \(Q\). From this definition it is clear that a sub-path \(\direct{R}{a}{b}\) joining vertices \(a_a\) and \(v_b\) is either equivalent to \(Q\), or a truncation of \(Q\).
 
 \section*{Cross-Source Correlation}
-We seek to define a class of covariance function \(k\) that considers the context of the source hierarchy.
+We seek to define a covariance function \(k\) that considers the context of the source hierarchy.
 We assume that observations two sources are correlated when the estimate of one source improves upon the other.
 In terms of the hierarchy, this corresponds to a directed path existing between the sources.
 The covariance of two observations at inputs \(\vct{x}\) and \(\vct{x}'\) becomes a function of the source fidelities \(\ell\) and \(\ell'\) and the source hierarchy.
@@ -169,277 +164,89 @@ The requirement that the source be connected by a directed path means that the v
 \[
 	k((\vct{x}, \ell), (\vct{x}', \ell'); H) \ne 0 \iff \source_\ell \rightsquigarrow \source_{\ell'}  \vee \source_{\ell'} \rightsquigarrow \source_{\ell}
 \]
-One common approach to estimating the response of a higher-fidelity source \(\source_{\ell}\) given observations from a lower-fidelity source \(\source_{\ell -1}\) involves modelling the discrepancy \(\delta_\ell\) between a scaled representation of the lower-fidelity source \(\varrho_{\ell-1}f_{\ell-1}\) and the higher-fidelity representation \(f_\ell\). A visual depiction of this is given in Figure \ref{fig:armfgp}.
+
+\subsection*{Adjacent Fidelity Case}
+\ac{gp} based approaches to estimating the response of a higher-fidelity source \(\source_{\ell}\) given observations from a lower-fidelity source \(\source_{\ell-1}\) involve modelling the discrepancy \(\delta_\ell\) between the mapped lower-fidelity representation \(z_{\ell-1}(f_{\ell-1})\) and the higher-fidelity observations \cite{perdikarisNonlinearInformationFusion2017}.
 \[
-	f_\ell = \varrho_{\ell-1}f_{\ell-1} + \delta_\ell \qquad
+	f_\ell = z_{\ell-1}(f_{\ell-1}) + \delta_\ell \qquad
 	\delta_\ell \sim \gp{m_{\delta_\ell}, k_{\delta_\ell}}
 \]
-\input{figures/xfc_forrester}
-In this approach, the influence of observations from \(\source_{\ell-1}\) on the posterior of \(f_\ell\) is governed entirely by the hyperparameter \(\varrho\). Which can be demonstrated by consider two independent \acp{gp} \(g_1\) and \(g_2\)
+\input{figures/adjacent_source_dag}
+Considering first the case where \(z_t\) takes the form proposed by O'Hagan, and \(z_\ell(x) = \varrho_\ell x\).
+In this approach, the influence of observations from \(\source_{\ell-1}\) on the posterior of \(f_\ell\) is governed entirely by the hyperparameter \(\varrho\), which may be shown as follows.
+
+Consider two independent \acp{gp} \(g_1\) and \(g_2\).
 \[
 	g_1 \sim \symcal{GP}(m_1, k_1) \quad
 	g_2 \sim \gp{m_2, k_2} \quad
 	g_1 \bot g_2
 \]
-for which the result of their weighted sum is also a \ac{gp} \(h\) with mean and covariance functions of the following form
-\[h = \alpha g_1 + \beta g_2 \quad
-	\Leftrightarrow \quad h \sim \symcal{GP}(\alpha m_1 + \beta m_2, \alpha^2k_1 + \beta^2k_2)
+the result of their weighted sum is
+\[
+	g = \alpha f_1 + \beta f_2 \quad
+	\Leftrightarrow \quad
+	g \sim \symcal{GP}(\alpha m_1 + \beta m_2, \alpha^2k_1 + \beta^2k_2)
 \]
-In our example, this property allows \(f_\ell\) to be rewritten as
+
+This property allows \(f_\ell\) to be written as
 \[
 	f_\ell \sim \gp{m_\ell, k_\ell} \qquad m_\ell = m_{\delta_\ell} + \varrho_{\ell-1}m_{\ell-1} \qquad k_\ell = k_{\delta_\ell} + \varrho^2_{\ell-1} k_{\ell-1}
 \]
-This means that any linear combination of \acp{gp} may be interpreted as a single \ac{gp} with an analytical posterior, the mean and covariance functions of which are defined through linear sums of the constituent mean and covariance functions \(\vct{m}_\delta\) and \(\vct{k}_\delta\). For our two source example this relationship takes the following form
+From this, any linear combination of \acp{gp} may be interpreted as a single \ac{gp} with an analytical posterior, the mean and covariance functions of which are defined through linear sums of the constituent mean and covariance functions \(\vct{m}_\delta\) and \(\vct{k}_\delta\). We use this to express the correlation between observations from adjacent fidelities as
 \begin{align*}
-	 & m_\ell((x, \ell))              = \langle \vct{m}_\delta, \vct{w}_m  \rangle   \\
-	 & k_\ell((x, \ell), (x', \ell-1))  = \langle \vct{k}_\delta, \vct{w}_k  \rangle
+	 & m_\ell((x, \ell))              = \langle \vct{m}_\delta, \vct{w}^m_{\ell-1, \ell}  \rangle \\
+	 & k_\ell((x, \ell), (x', \ell-1))  = \langle \vct{k}_\delta, \vct{w}_{\ell-1,\ell}  \rangle
 \end{align*}
 where
 \begin{align*}
-	\vct{m}_\delta & = \begin{bmatrix}  m_{\delta_\ell}(x) & m_{\ell-1}(x) \end{bmatrix} & \vct{w}_m = \begin{bmatrix} 1 & \varrho_{\ell-1}  \end{bmatrix}  \\
-	\vct{k}_\delta & = \begin{bmatrix}  k_{\delta_\ell}(x) & k_{\ell-1}(x) \end{bmatrix} & \vct{w}_k = \begin{bmatrix} 1 & \varrho_{\ell-1}^2 \end{bmatrix} \\
+	\vct{m}_\delta & = \begin{bmatrix}  m_{\delta_\ell}(x) & m_{\ell-1}(x) \end{bmatrix} & \vct{w}^m_{\ell-1, \ell} = \begin{bmatrix} 1 & \varrho_{\ell-1}  \end{bmatrix} \\
+	\vct{k}_\delta & = \begin{bmatrix}  k_{\delta_\ell}(x) & k_{\ell-1}(x) \end{bmatrix} & \vct{w}_{\ell-1,\ell} = \begin{bmatrix} 1 & \varrho_{\ell-1}^2 \end{bmatrix}   \\
 \end{align*}
+\input{figures/xfc_forrester}
 
-Extending this to \(L\) many sources with an arbitrary hierarchy we consider that the correlation between observations from \(\source_u\) and \(\source_v\) is influenced by all passible directed paths \(P_{u \rightarrow v} \subseteq P\) between them.
+\section*{Generalised Formulation}
+We introduce a pair of weight matrices \(\mat{W}_m\) and \(\mat{W}_k\) where each entry \(w_{u \, \scriptveryshortarrow v, i}\) is the linear weight associated with the respective mean and covariance of the representation at fidelity \(i\) for observations at fidelities \(u\) and \(v\).
 
+Extending to \(L\) many sources with an arbitrary hierarchy we consider that the correlation between observations from \(\source_u\) and \(\source_v\) is influenced by all passible directed paths \(\direct{P}{u}{v} \subseteq P\) between them.
+\begingroup
+\renewcommand*{\arraystretch}{1.5}
 \begin{align*}
-	\mat{W}_m(H) & = \begin{bmatrix}
-		                 \vct{w}^m_{1,1} & \dots  & \vct{w}^m_{L,1} \\
-		                 \vdots          & \ddots & \vdots          \\
-		                 \vct{w}^m_{1,L} & \dots  & \vct{w}^m_{L,L} \\
-	                 \end{bmatrix} &
-	\mat{W}_k(H) & = \begin{bmatrix}
-		                 \vct{w}^k_{1,1} & \dots  & \vct{w}^k_{L,1} \\
-		                 \vdots          & \ddots & \vdots          \\
-		                 \vct{w}^k_{1,L} & \dots  & \vct{w}^k_{L,L} \\
-	                 \end{bmatrix}
+	\mat{W}_m(H)                          & = \begin{bmatrix}
+		                                          \wvct{m}{1}{1} \\
+		                                          \vdots         \\
+		                                          \wvct{m}{1}{L} \\
+	                                          \end{bmatrix}                                                                                               &
+	\mat{W}_k(H)                          & = \begin{bmatrix}
+		                                          \wvct{k}{1}{1} & \dots  & \wvct{k}{L}{1} \\
+		                                          \vdots         & \ddots & \vdots         \\
+		                                          \wvct{k}{1}{L} & \dots  & \wvct{k}{L}{L} \\
+	                                          \end{bmatrix}                                                                        \\
+	\vspace{1em}                                                                                                                                              \\
+	w^m_{u \, \scriptveryshortarrow v, i} & = \sum_{Q\,\in\,\direct{P}{u}{v}} \, \prod_{(a,b) \, \in \, \direct{R}{i}{v} \given Q} \direct{\varrho}{a}{b}   &
+	w^k_{u \, \scriptveryshortarrow v, i} & = \sum_{Q\,\in\,\direct{P}{u}{v}} \, \prod_{(a,b) \, \in \, \direct{R}{i}{v} \given Q} \direct{\varrho^2}{a}{b}
 \end{align*}
-
-THIS IS WRONG - NEED SUB-PATH LOGIC - Should be product of all edges in sub-path of u -> v from i -> v
-\begin{align*}
-	w^m_{u,v,i} & = \sum_{p\,\in\,P_{u,v}} \, \prod_{(j,k) \, \in \, p} \varrho_{j,k}   &
-	w^k_{u,v,i} & = \sum_{p\,\in\,P_{u,v}} \, \prod_{(j,k) \, \in \, p} \varrho_{j,k}^2
-\end{align*}
+\endgroup
 
 The generalised cross-fidelity mean and covariance functions are then
 \[
-	m((x,\ell) \given H) = \langle \vct{m}_\delta, \vct{w}^m_{0, \ell}  \rangle  \qquad k((\vct{x}, \ell), (\vct{x}', \ell') \given H) = \langle \vct{k}_\delta, \vct{w}^k_{\ell,\ell'}  \rangle
+	m((x,\ell) \given H) = \langle \vct{m}_\delta, \wvct{m}{1}{\ell}  \rangle  \qquad
+	k((\vct{x}, \ell), (\vct{x}', \ell') \given H) = \langle \vct{k}_\delta,\wvct{k}{\min(\ell, \ell')}{\max(\ell,\ell')}  \rangle
 \]
+Derivation would be nice.
 
-\section*{The Autoregressive Scheme}
-Kennedy and O'Hagan introduce an autoregressive scheme to combine information from sources with differing fidelities.
+\section*{Auto-Regressive Example}
+Kennedy and O'Hagan introduce an autoregressive scheme to combine information from sources with differing fidelities \cite{kennedyPredictingOutputComplex2000}.
 \[
 	f_1 \sim \gp{m_{\delta_1}, k_{\delta_1}} \qquad f_\ell = \varrho_{\ell-1} f_{\ell-1} + \delta_\ell \quad \ell \in \{2. \dots, L\} \qquad \delta_\ell \sim \symcal{GP}(m_{\delta_\ell}, k_{\delta_\ell})
 \]
-where scalar hyperparameters \(\vct{\varrho}\) scale successive representations of \(f\) and \(\delta_\ell\) models the discrepancy between \(f_\ell\) and the scaled model \(\varrho_{\ell-1}f_{\ell-1}\)  as a \ac{gp} with mean and covariance functions \(m_{\delta_\ell}\) and \(k_{\delta_\ell}\). This scheme is represented graphically in Figure \ref{fig:armfgp}.
-
-\begin{figure}[H]
-	\centering
-	\begin{tikzpicture}
-		\GraphInit[vstyle=Classic]
-		\SetGraphUnit{2}
-		\tikzset{EdgeStyle/.style={->,>=latex}}
-		%\draw[help lines] (0,0) grid (9,2);
-		\Vertex[x=0,y=0,Lpos=-90,L={$f_1$}]{f1}
-		\Vertex[x=3,y=0,Lpos=-90,L={$f_2$}]{f2}
-		\Vertex[x=6,y=0,Lpos=-90,L={$f_3$}]{f3}
-		\Vertex[x=9,y=0,Lpos=-90,L={$f_{L-1}$}]{flm1}
-		\Vertex[x=12,y=0,Lpos=-90,L={$f_L$}]{fl}
-		\Edge[label={$\varrho_1 \delta_2$}](f1)(f2)
-		\Edge[label={$\varrho_2 \delta_3$}](f2)(f3)
-		\node at (7.5,0) {$\dots$};
-		\Edge[label={$\varrho_{L-1} \delta_L$}](flm1)(fl)
-	\end{tikzpicture}
-	\caption{A graphical representation of the autoregressive scheme presented by [cite]}
-	\label{fig:armfgp}
-\end{figure}
-
-This formulation implies that a given source \(\source_{\ell+1}\) provides a better estimate of the highest fidelity source \(\source_L\) than its child \(\source_{\ell}\), resulting in the following hierarchy.
+This formulation implies that a given source \(\source_{\ell+1}\) provides a better estimate of the highest fidelity source \(\source_L\) than its child \(\source_{\ell}\), resulting in the following hierarchy, show in figure \ref{fig:armfgp}.
 \[
 	V_\text{AR} = \{\source_\ell\}^{L}_{\ell=1} \qquad
 	E_\text{AR} = \{(\source_{\ell},   \source_{\ell+1})\}^{L-1}_{\ell = 1} \qquad
-	\source_\ell : \mathcal{X} \rightarrow \mathcal{Y}
+	%\source_\ell : \mathcal{X} \rightarrow \mathcal{Y}
 \]
-The cross-source correlation for this scheme may be derived using the fact that for
-For a scheme with \(L\) many sources, the mean and covariance functions of the representation \(f_\ell\) can be written as
+\input{figures/auto_dag}
 
-% By repeating this processes and expanding the mean and covariance functions of each representation in this equation, we expose a set of linear equations that combine vectors of the constituent mean and covariance functions  \(\vct{m}_\delta\) and \(\vct{k}_\delta\) for each representation.
-
-% For our auto-regressive scheme, these systems expand to
-% \begingroup
-% \renewcommand*{\arraystretch}{1.5}
-% \[
-% 	\begin{bmatrix}
-% 		m_1    \\
-% 		m_2    \\
-% 		m_3    \\
-% 		\vdots \\
-% 		m_L
-% 	\end{bmatrix} = \begin{bmatrix}
-% 		1                  & 0         & 0      & \dots  & 0 \\
-% 		\varrho_1          & 1         & 0      & \dots  & 0 \\
-% 		\varrho_2\varrho_1 & \varrho_2 & 1      & \dots  & 0 \\
-% 		\vdots             & \vdots    & \vdots & \ddots & 0 \\
-% 		M_{L1}             & M_{L2}    & M_{L3} & \dots  & 1
-% 	\end{bmatrix}
-% 	\begin{bmatrix}
-% 		m_{\delta_1} \\
-% 		m_{\delta_2} \\
-% 		m_{\delta_3} \\
-% 		\vdots       \\
-% 		m_{\delta_L}
-% 	\end{bmatrix}
-% 	\qquad
-% 	\begin{bmatrix}
-% 		k_1    \\
-% 		k_2    \\
-% 		k_3    \\
-% 		\vdots \\
-% 		k_L
-% 	\end{bmatrix} = \begin{bmatrix}
-% 		1                       & 0           & 0      & \dots  & 0 \\
-% 		\varrho_1^2             & 1           & 0      & \dots  & 0 \\
-% 		\varrho_2^2 \varrho_1^2 & \varrho_2^2 & 1      & \dots  & 0 \\
-% 		\vdots                  & \vdots      & \vdots & \ddots & 0 \\
-% 		N_{L1}                  & N_{L2}      & M_{L3} & \dots  & 1
-% 	\end{bmatrix}
-% 	\begin{bmatrix}
-% 		k_{\delta_1} \\
-% 		k_{\delta_2} \\
-% 		k_{\delta_3} \\
-% 		\vdots       \\
-% 		k_{\delta_L}
-% 	\end{bmatrix}
-% \]
-% \endgroup
-% where
-% \[
-% 	M_{ij}(H_\text{AR}) = \prod^{i-1}_{d=j} \varrho_d \quad
-% 	C_{ij}(H_\text{AR}) = \prod^{i-1}_{d=j} \varrho_d^2
-% \]
-
-Generally, the mean and kernel functions can be written as the inner products of the constituent means and kernels \(\vct{m}_\delta\) and \(\vct{k}_\delta\), and a vector capturing the influence of the hyper-parameters and hierarchy \(\vct{\eta}(\ell, \ell'; \vct{\theta}, H)\).
-\[
-	m(\vct{x}) = \langle\vct{m}_\delta(\vct{x}), \vct{\eta}(\ell, \ell'; \vct{\theta}, H)\rangle \quad
-	k(\vct{x}, \vct{x}') = \langle\vct{k}_\delta(\vct{x}, \vct{x}'), \vct{\kappa}(\ell, \ell'; \vct{\theta}, H)\rangle
-\]
-Where \(\eta_i\) and \(\kappa_i\) characterise the relationship between level \(i\) and \(\max(\ell,\ell')\) given the hierarchy
-\[
-	\eta_i = \prod
-\]
-
-% These properties mean that the posterior distribution of a given representation can be given as a single, analytically, tractable distribution. This reframes the solution as a task learning of hyperparameters that optimally combine the constituent mean and covariance functions within a structure determined scheme. In this sense, the scheme encodes the model hierarchy into the kernel function.
-% \subsection*{Joint Distribution}
-%
-% [Rehome and rework this]
-% \[
-% 	\vct{m} = \mat{M}\vct{m}_\delta \quad \vct{k} = \mat{N}\vct{k}_\delta  
-% \]
-% In our cannonical example \(\mat{M}\) and \(\mat{N}\) are
-
-\section*{Counter Example}
-In multi-physics modelling it is not always possible to arrange sources in such a strict hierarchy. Additional sources may act to add unrelated complexity. In a sense the information gained by two such models is orthogonal, as the knowledge gain by one has no bearing on the knowledge gained by the other. In this case it is dishonest to arrange the models as proposed in the canonical example. In this context I proposed a different multi-fidelity scheme.
-
-\[
-	f_1 \sim \symcal{GP}(m_1,k_1)
-\]
-\[
-	f_\ell \sim \symcal{GP}(\varrho_{1\ell} m_1 + m_{\delta_{1\ell}}, \varrho_{1\ell}^2 k_1 + k_{\delta_{1\ell}})  \quad \ell \in \{2, ..., L - 1\}
-\]
-\[
-	f_L \sim \symcal{GP}\left(
-	\sum^{L-1}_{\ell=2} \varrho_{\ell L}\varrho_{1 \ell} m_1 + \varrho_{\ell L} m_{\delta_{1\ell}} + m_{\ell L},
-	\sum^{L-1}_{\ell=2} \varrho^2_{\ell L}\varrho^2_{1 \ell} k_1 + \varrho^2_{\ell L} k_{\delta_{1\ell}} + k_{\ell L}
-	\right)
-\]
-
-Where \(\varrho_{qr}\) is the weight scaling \(f_q\) for use in defining \(f_r\), and \(\delta_{qr}\) is the discrepancy between the weighted distribution \(\varrho_{qr}f_q\) and \(f_r\).
-
-This scheme models a system where source is improved in unique orthogonal senses by \(L-2\) additional sources, which are all captured by a single high fidelity source. Visually this may be represented as
-\begin{figure}[H]
-	\centering
-	\begin{tikzpicture}
-		\GraphInit[vstyle=Classic]
-		\tikzset{EdgeStyle/.style={->,>=latex}}
-		\SetGraphUnit{2}
-		%\draw[help lines] (0,0) grid (9,2);
-		\Vertex[x=0,y=0,Lpos=-90,L={$f_1$}]{f1}
-		\Vertex[x=4.5,y=3,Lpos=-90,L={$f_2$}]{f2}
-		\Vertex[x=4.5,y=1,Lpos=-90,L={$f_3$}]{f3}
-		\Vertex[x=4.5,y=-1,Lpos=-90,L={$f_4$}]{f4}
-		\Vertex[x=4.5,y=-3,Lpos=-90,L={$f_{L-1}$}]{flm1}
-		\Vertex[x=9,y=0,Lpos=-90,L={$f_L$}]{fl}
-		\node at (4.5,-2.2) {$\vdots$};
-		\Edge[label={$\varrho_{12} \delta_{12} $}](f1)(f2)
-		\Edge[label={$\varrho_{13} \delta_{13} $}](f1)(f3)
-		\Edge[label={$\varrho_{14} \delta_{14} $}](f1)(f4)
-		\Edge[label={$\varrho_{1L} \delta_{1L-1} $}](f1)(flm1)
-		\Edge[label={$\varrho_{2L} \delta_{2L} $}](f2)(fl)
-		\Edge[label={$\varrho_{3L} \delta_{3L} $}](f3)(fl)
-		\Edge[label={$\varrho_{4L} \delta_{4L} $}](f4)(fl)
-		\Edge[label={$\varrho_{L-1L} \delta_{L-1L} $}](flm1)(fl)
-	\end{tikzpicture}
-	\caption{An alternate multi-fidelity scheme}
-\end{figure}
-
-The system mapping the means and covariance functions is
-\begingroup
-\renewcommand*{\arraystretch}{1.5}
-\[
-	\begin{bmatrix}
-		m_1     \\
-		m_2     \\
-		m_3     \\
-		\vdots  \\
-		m_{L-1} \\
-		m_{L}
-	\end{bmatrix} = \begin{bmatrix}
-		1                                                   & 0            & 0            & \cdots & 0              & 0      & \cdots & 0      \\
-		\varrho_{12}                                        & 1            & 0            & \cdots & 0              & 0      & \cdots & 0      \\
-		\varrho_{13}                                        & 0            & 1            & \cdots & 0              & 0      & \cdots & 0      \\
-		\vdots                                              & \vdots       & \vdots       & \ddots & \vdots         & \vdots & \ddots & \vdots \\
-		\varrho_{1L-1}                                      & 0            & 0            & 0      & 1              & 0      & \cdots & 0      \\
-		\sum^{L-1}_{\ell=2} \varrho_{1\ell}\varrho_{\ell L} & \varrho_{2L} & \varrho_{3L} & \cdots & \varrho_{L-1L} & 1      & \cdots & 1      \\
-	\end{bmatrix}
-	\begin{bmatrix}
-		m_{1}             \\
-		m_{\delta_{12}}   \\
-		m_{\delta_{13}}   \\
-		\vdots            \\
-		m_{\delta_{1L-1}} \\
-		m_{\delta_{2L}}   \\
-		\vdots            \\
-		m_{\delta_{L-1L}} \\
-	\end{bmatrix}
-\]
-\[
-	\begin{bmatrix}
-		k_1     \\
-		k_2     \\
-		k_3     \\
-		\vdots  \\
-		k_{L-1} \\
-		k_{L}
-	\end{bmatrix} = \begin{bmatrix}
-		1                                                       & 0              & 0              & \cdots & 0                & 0      & \cdots & 0      \\
-		\varrho^2_{12}                                          & 1              & 0              & \ddots & 0                & 0      & \cdots & 0      \\
-		\varrho^2_{13}                                          & 0              & 1              & \ddots & 0                & 0      & \cdots & 0      \\
-		\vdots                                                  & \vdots         & \ddots         & \ddots & \vdots           & \vdots & \ddots & \vdots \\
-		\varrho^2_{1L-1}                                        & 0              & \cdots         & 0      & 1                & 0      & \cdots & 0      \\
-		\sum^{L-1}_{\ell=2} \varrho^2_{1\ell}\varrho^2_{\ell L} & \varrho^2_{2L} & \varrho^2_{3L} & \cdots & \varrho^2_{L-1L} & 1      & \cdots & 1      \\
-	\end{bmatrix}
-	\begin{bmatrix}
-		k_{1}             \\
-		k_{\delta_{12}}   \\
-		k_{\delta_{13}}   \\
-		\vdots            \\
-		k_{\delta_{1L-1}} \\
-		k_{\delta_{2L}}   \\
-		\vdots            \\
-		k_{\delta_{L-1L}} \\
-	\end{bmatrix}
-\]
-\endgroup
-\section*{Generalised Case}
-The linearity property implies that any such hierarchy represented as a directed acyclic graph defines a \ac{gp} with a mean and covariance functions that capture the hierarchical relationship between sources in the graph.
+\bibliography{references/GPS}
 \end{document}
+

@@ -48,3 +48,7 @@ ignore = [
   "F722", # Forward annotation syntax (jaxtyping shape strings)
   "F821", # Undefined name (e.g. "D" in jaxtyping)
 ]
+
+[tool.pyright]
+reportInvalidTypeForm = false       # Forward refs to metaclass-generated types
+reportGeneralTypeIssues = "warning" # Downgrade to warning instead of error

@@ -1,0 +1,14 @@
+\begin{figure}[H]
+	\centering
+	\begin{tikzpicture}
+		\GraphInit[vstyle=Classic]
+		\SetGraphUnit{2}
+		\tikzset{EdgeStyle/.style={->,>=latex}}
+		%\draw[help lines] (0,0) grid (9,2);
+		\Vertex[x=0,y=0,Lpos=-90,L={$f_{\ell-1}$}]{f1}
+		\Vertex[x=3,y=0,Lpos=-90,L={$f_\ell$}]{f2}
+		\Edge[label={$z_{\ell-1} \delta_\ell$}](f1)(f2)
+	\end{tikzpicture}
+	\caption{\ac{dag} of a two source hierarchy.}
+	\label{fig:adjacent_source}
+\end{figure}
