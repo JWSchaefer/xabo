@@ -1,24 +1,21 @@
-from abc import ABC, abstractmethod
-from typing import Generic, TypeVar
+from typing import Generic, Optional, TypeVar
+
+from xabo.core.prior import Prior
+
+from ._transform import Transform
 
 T = TypeVar('T')
 
 
-class Transform(Generic[T]):
-    pass
+class Parameter(Generic[T]):
+    """Type marker for model parameters.
 
+    Use in type hints to declare parameters:
+        class MyModel(Spec):
+            lengthscale: Parameter[float]
 
-class Prior(Generic[T]):
-    pass
+    Class attributes define defaults for transform and prior.
+    """
 
-
-class Default(ABC, Generic[T]):
-    @classmethod
-    @abstractmethod
-    def default(cls) -> T:
-        raise NotImplementedError('Default method not implemented')
-
-
-class Parameter(Default[T]):
-    transform: Transform[T]
-    prior: Prior[T]
+    transform: Optional[Transform[T]] = None
+    prior: Optional[Prior[T]] = None
