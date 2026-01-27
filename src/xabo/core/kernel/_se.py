@@ -1,40 +1,37 @@
-# from typing import Generic
-#
-# import jax.numpy as np
-# from beartype import beartype
-# from jaxtyping import Float
-#
-# from ..typing import typecheck
-# from ._kernel import Kernel
-# from ._types import KernelInputA, KernelInputB, KernelOutput
-#
-# from
-#
-# @beartype
-# class SquaredExponential(Kernel, Generic[R,S]):
-#
-#     ell: Parameter[R]
-#     sigma: Parameter[S]
-#
-#     def __init__(
-#         self: 'SquaredExponential',
-#         lengthscale: R,
-#         variance: S,
-#     ):
-#         self.ell = lengthscale
-#         self.sigma = variance
-#
-#     @typecheck
-#     def __call__(
-#         self: 'SquaredExponential',
-#         x: KernelInputA,
-#         x_tick: KernelInputB,
-#     ) -> KernelOutput:
-#
-#         diff = x[..., :, None, :] - x_tick[..., None, :, :]
-#
-#         sqdist = np.sum(np.pow(diff, 2), axis=-1)
-#
-#         out = self.sigma * np.exp(-0.5 * sqdist / (self.ell**2))
-#
-#         return out
+from typing import Generic
+
+import jax.numpy as jnp
+from beartype import beartype
+
+from xabo.core.spec._parameter import Parameter
+
+from ..typing._typecheck import typecheck
+from ._kernel import Kernel
+from ._types import KernelInputA, KernelInputB, KernelOutput, R, S
+
+
+@beartype
+class SquaredExponential(Kernel, Generic[R, S]):
+
+    ell: Parameter[R]
+    sigma: Parameter[S]
+
+    @typecheck
+    def __call__(
+        self,
+        state: 'SquaredExponential.State',
+        params: 'SquaredExponential.Params',
+        x: KernelInputA,
+        x_tick: KernelInputB,
+    ) -> KernelOutput:
+
+        ell: R = params.ell
+        sigma: S = params.sigma
+
+        diff = x[..., :, None, :] - x_tick[..., None, :, :]
+
+        sqdist = jnp.sum(jnp.pow(diff, 2), axis=-1)
+
+        out = sigma * jnp.exp(-0.5 * sqdist / (ell**2))
+
+        return out

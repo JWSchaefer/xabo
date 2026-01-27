@@ -1,42 +1,44 @@
-# from typing import Generic
-#
-# import jax.numpy as np
-# from beartype import beartype
-#
-# from xabo.core.typing import typecheck
-#
-# from ._kernel import Kernel
-# from ._types import KernelInputA, KernelInputB, KernelOutput, R, S
-#
-#
-# @beartype
-# class Matern52(Kernel, Generic[R, S]):
-#
-#     rho: Parameter[R]
-#     sigma: Parameter[S]
-#
-#     def __init__(self, lengthscale: R, variance: S) -> None:
-#         self.rho = lengthscale
-#         self.sigma = variance
-#
-#     @typecheck
-#     def __call__(
-#         self: 'Matern52',
-#         x: KernelInputA,
-#         x_tick: KernelInputB,
-#     ) -> KernelOutput:
-#
-#         d = np.sum(
-#             np.abs(x[..., :, None, :] - x_tick[..., None, :, :]),
-#             axis=-1,
-#         )
-#
-#         return (
-#             (self.sigma**2)
-#             * (
-#                 1
-#                 + (np.sqrt(5) * d / self.rho)
-#                 + (5 * np.pow(d, 2) / (3 * (self.rho**2)))
-#             )
-#             * np.exp(-((np.sqrt(5) * d / self.rho)))
-#         )
+from typing import Generic
+
+import jax.numpy as jnp
+from beartype import beartype
+
+from xabo.core.spec._parameter import Parameter
+
+from ..typing._typecheck import typecheck
+from ._kernel import Kernel
+from ._types import KernelInputA, KernelInputB, KernelOutput, R, S
+
+
+@beartype
+class Matern52(Kernel, Generic[R, S]):
+
+    rho: Parameter[R]
+    sigma: Parameter[S]
+
+    @typecheck
+    def __call__(
+        self,
+        state: 'Matern52.State',
+        params: 'Matern52.Params',
+        x: KernelInputA,
+        x_tick: KernelInputB,
+    ) -> KernelOutput:
+
+        rho = params.rho
+        sigma = params.sigma
+
+        d = jnp.sum(
+            jnp.abs(x[..., :, None, :] - x_tick[..., None, :, :]),
+            axis=-1,
+        )
+
+        return (
+            (sigma**2)
+            * (
+                1
+                + (jnp.sqrt(5) * d / rho)
+                + (5 * jnp.pow(d, 2) / (3 * (rho**2)))
+            )
+            * jnp.exp(-((jnp.sqrt(5) * d / rho)))
+        )
