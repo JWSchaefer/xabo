@@ -1,10 +1,9 @@
-from typing import Generic, Optional, TypeVar
+from typing import Generic, Optional
 
 from xabo.core.prior import Prior
 
+from .._types import T
 from ..transform._transform import Transform
-
-T = TypeVar('T')
 
 
 class Parameter(Generic[T]):

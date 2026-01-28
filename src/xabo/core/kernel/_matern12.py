@@ -7,14 +7,14 @@ from xabo.core.spec._parameter import Parameter
 
 from ..typing._typecheck import typecheck
 from ._kernel import Kernel
-from ._types import KernelInputA, KernelInputB, KernelOutput, R, S
+from ._types import KernelInputA, KernelInputB, KernelOutput, L
 
 
 @beartype
-class Matern12(Kernel, Generic[R, S]):
+class Matern12(Kernel, Generic[L]):
 
-    ell: Parameter[R]
-    sigma: Parameter[S]
+    ell: L
+    sigma: Parameter[float]
 
     @typecheck
     def __call__(

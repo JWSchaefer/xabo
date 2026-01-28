@@ -1,6 +1,7 @@
-from typing import TypeAlias
+from typing import TypeAlias, TypeVar
 
-from jax import Array
-from jaxtyping import Float
+from jaxtyping import Array, Float
 
-Scalar: TypeAlias = Float[Array, '']
+T = TypeVar('T', float, Float[Array, ''], Float[Array, '...'])
+
+Scalar: TypeAlias = Float[Array, ''] | Float[Array, 'N']

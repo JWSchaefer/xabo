@@ -3,9 +3,10 @@ from typing import TypeAlias, TypeVar
 from jax import Array
 from jaxtyping import Float
 
+from ..spec._parameter import Parameter
+
 KernelInputA: TypeAlias = Float[Array, '*S A X']
 KernelInputB: TypeAlias = Float[Array, '*S B X']
 KernelOutput: TypeAlias = Float[Array, '*S A B']
 
-R = TypeVar('R', float, Array)
-S = TypeVar('S', float, Array)
+L = TypeVar('L', bound=Parameter)

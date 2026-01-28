@@ -1,9 +1,9 @@
 from abc import ABC, abstractmethod
-from typing import Generic, TypeVar
+from typing import Generic
 
-from xabo.core._types import Scalar
+from jax import Array
 
-T = TypeVar('T')
+from .._types import Scalar, T
 
 
 class Prior(ABC, Generic[T]):
@@ -11,10 +11,18 @@ class Prior(ABC, Generic[T]):
 
     @abstractmethod
     def log_prob(self, value: T) -> Scalar:
-        """Log probability density at value (in constrained space)."""
+        """Log probability density at value (in constrained space).
+
+        For arrays, returns the sum of element-wise log probs.
+        """
         ...
 
     @abstractmethod
-    def sample(self, rng_key) -> T:
-        """Sample from prior (returns constrained value)."""
+    def sample(self, rng_key, shape=()) -> Array:
+        """Sample from prior (returns constrained value).
+
+        Args:
+            rng_key: JAX random key
+            shape: Output shape (default: scalar)
+        """
         ...

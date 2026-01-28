@@ -3,6 +3,7 @@ from dataclasses import fields as dataclass_fields
 from dataclasses import make_dataclass
 from typing import (
     Any,
+    Callable,
     Generic,
     Optional,
     Type,
@@ -15,6 +16,7 @@ from typing import (
 import jax.tree_util
 from jax import Array
 
+from ..prior import Prior
 from ..transform import Log
 from ._parameter import Parameter
 from ._state import State
@@ -44,6 +46,12 @@ def _generate_params_class(spec_cls: type) -> type:
         if isinstance(origin, type) and issubclass(origin, Parameter):
             inner_type = get_args(ann)[0] if get_args(ann) else Any
             fields.append((name, inner_type))
+
+        elif isinstance(origin, TypeVar):
+            # Handle TypeVars bound to Parameter
+            bound = getattr(origin, '__bound__', None)
+            if bound is not None and issubclass(bound, Parameter):
+                fields.append((name, Any))
 
         elif isinstance(origin, type) and issubclass(origin, Spec):
             # Nested Spec - recursively generate its Params class
@@ -147,7 +155,7 @@ class Spec(ABC, Generic[P, S], metaclass=SpecMeta):
     """
 
     Params: type[P]  # Set by metaclass
-    State: type[S]   # Set by metaclass
+    State: type[S]  # Set by metaclass
 
     def __init__(self, **kwargs):
         """Initialize with values for Parameters and nested Specs.
@@ -221,6 +229,16 @@ class Spec(ABC, Generic[P, S], metaclass=SpecMeta):
                         'Sampling from priors not yet implemented'
                     )
                 params[name] = value
+
+            elif isinstance(origin, TypeVar):
+                bound = getattr(origin, '__bound__', None)
+                if bound is not None and issubclass(bound, Parameter):
+                    value = getattr(self, name)
+                    if from_prior:
+                        raise NotImplementedError(
+                            'Sampling from priors not yet implemented'
+                        )
+                    params[name] = value
 
             elif isinstance(origin, type) and issubclass(origin, Spec):
                 nested_spec = getattr(self, name)
@@ -299,28 +317,75 @@ class Spec(ABC, Generic[P, S], metaclass=SpecMeta):
 
         return self.__class__.State(**converted)
 
+    def _collect(
+        self,
+        extractor: Callable[[type], Any],
+        include_none: bool = False,
+    ) -> dict:
+        """Collect values from Parameter leaves using an extractor function.
+
+        Args:
+            extractor: Function that takes a Parameter class and returns a value
+            include_none: Whether to include None values
+
+        Returns:
+            Nested dict mapping param names to extracted values.
+        """
+        hints = get_type_hints(self.__class__)
+        result = {}
+
+        for name, ann in hints.items():
+            origin = get_origin(ann) or ann
+
+            if isinstance(origin, type) and issubclass(origin, Parameter):
+                value = extractor(origin)
+                if include_none or value is not None:
+                    result[name] = value
+
+            elif isinstance(origin, type) and issubclass(origin, Spec):
+                nested_spec = getattr(self, name)
+                nested_result = nested_spec._collect(extractor, include_none)
+                if nested_result:
+                    result[name] = nested_result
+
+        return result
+
+    def _collect_by_type(
+        self,
+        target_type: type,
+        include_none: bool = False,
+    ) -> dict:
+        """Collect attributes matching a type from Parameter leaves.
+
+        Args:
+            target_type: The type to search for (e.g., Transform, Prior)
+            include_none: Whether to include None values
+
+        Returns:
+            Nested dict mapping param names to matching attribute values.
+        """
+
+        def extractor(param_cls: type) -> Any:
+            for attr_name in dir(param_cls):
+                if attr_name.startswith('_'):
+                    continue
+                attr = getattr(param_cls, attr_name, None)
+                if isinstance(attr, target_type):
+                    return attr
+            return None
+
+        return self._collect(extractor, include_none)
+
     def _get_transforms(self) -> dict:
         """Get transforms for each parameter.
 
         Returns:
             Nested dict mapping param names to their Transform instances.
         """
-        hints = get_type_hints(self.__class__)
-        transforms = {}
-
-        for name, ann in hints.items():
-            origin = get_origin(ann) or ann
-
-            if isinstance(origin, type) and issubclass(origin, Parameter):
-                transforms[name] = getattr(origin, 'transform', Log())
-
-            elif isinstance(origin, type) and issubclass(origin, Spec):
-                nested_spec = getattr(self, name)
-                nested_transforms = nested_spec._get_transforms()
-                if nested_transforms:
-                    transforms[name] = nested_transforms
-
-        return transforms
+        return self._collect(
+            lambda p: getattr(p, 'transform', None) or Log(),
+            include_none=True,
+        )
 
     def _get_priors(self) -> dict:
         """Get priors for each parameter.
@@ -328,24 +393,8 @@ class Spec(ABC, Generic[P, S], metaclass=SpecMeta):
         Returns:
             Nested dict mapping param names to their Prior instances (or None).
         """
-        hints = get_type_hints(self.__class__)
-        priors = {}
 
-        for name, ann in hints.items():
-            origin = get_origin(ann) or ann
-
-            if isinstance(origin, type) and issubclass(origin, Parameter):
-                prior = getattr(origin, 'prior', None)
-                if prior is not None:
-                    priors[name] = prior
-
-            elif isinstance(origin, type) and issubclass(origin, Spec):
-                nested_spec = getattr(self, name)
-                nested_priors = nested_spec._get_priors()
-                if nested_priors:
-                    priors[name] = nested_priors
-
-        return priors
+        return self._collect_by_type(Prior, include_none=False)
 
     @classmethod
     def to_spec(cls: Type['Spec']) -> dict:

@@ -1,18 +1,18 @@
 import jax.numpy as jnp
+from jax import Array
 
-from .._types import Scalar
+from .._types import Scalar, T
 from ._transform import Transform
-from ._types import T
 
 
 class Identity(Transform[T]):
     """Identity transform for unconstrained parameters."""
 
-    def forward(self, unconstrained: T) -> T:
-        return unconstrained
+    def forward(self, unconstrained: T) -> Array:
+        return jnp.asarray(unconstrained)
 
-    def inverse(self, constrained: T) -> T:
-        return constrained
+    def inverse(self, constrained: T) -> Array:
+        return jnp.asarray(constrained)
 
     def log_det_jacobian(self, unconstrained: T) -> Scalar:
         return jnp.zeros(())

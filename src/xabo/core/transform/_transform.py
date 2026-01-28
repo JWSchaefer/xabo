@@ -1,9 +1,9 @@
 from abc import ABC, abstractmethod
 from typing import Generic
 
-from xabo.core._types import Scalar
+from jax import Array
 
-from ._types import T
+from xabo.core._types import Scalar, T
 
 
 class Transform(ABC, Generic[T]):
@@ -15,12 +15,12 @@ class Transform(ABC, Generic[T]):
     """
 
     @abstractmethod
-    def forward(self, unconstrained: T) -> T:
+    def forward(self, unconstrained: T) -> Array:
         """Map from unconstrained to constrained space."""
         ...
 
     @abstractmethod
-    def inverse(self, constrained: T) -> T:
+    def inverse(self, constrained: T) -> Array:
         """Map from constrained to unconstrained space."""
         ...
 
