@@ -37,7 +37,7 @@ runtime_typechecking = true
 [tool.hatch.build.targets.wheel]
 packages = ["src/xabo"]
 
-[tool.pytest]
+[tool.pytest.ini_options]
 addopts = ["-s", "-ra", "-rP"]
 testpaths = ["tests"]
 

@@ -55,11 +55,6 @@ class Model(Generic[P, S]):
             flat: 1D array containing all parameter values.
             structure: Structure information needed for unflattening.
 
-        Example:
-            >>> flat, structure = model.flatten_params()
-            >>> # Use with scipy.optimize, custom optimizers, etc.
-            >>> result = scipy.optimize.minimize(loss_fn, flat, ...)
-            >>> new_model = model.unflatten_params(result.x, structure)
         """
         leaves, treedef = jax.tree_util.tree_flatten(self.params)
 
@@ -94,11 +89,6 @@ class Model(Generic[P, S]):
 
         Returns:
             New Model with reconstructed params.
-
-        Example:
-            >>> flat, structure = model.flatten_params()
-            >>> # Optimize flat array...
-            >>> new_model = model.unflatten_params(optimized_flat, structure)
         """
         leaves = []
         offset = 0

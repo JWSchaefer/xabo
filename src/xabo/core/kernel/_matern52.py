@@ -13,7 +13,7 @@ from ._types import KernelInputA, KernelInputB, KernelOutput, R, S
 @beartype
 class Matern52(Kernel, Generic[R, S]):
 
-    rho: Parameter[R]
+    ell: Parameter[R]
     sigma: Parameter[S]
 
     @typecheck
@@ -25,7 +25,7 @@ class Matern52(Kernel, Generic[R, S]):
         x_tick: KernelInputB,
     ) -> KernelOutput:
 
-        rho = params.rho
+        ell = params.ell
         sigma = params.sigma
 
         d = jnp.sum(
@@ -37,8 +37,8 @@ class Matern52(Kernel, Generic[R, S]):
             (sigma**2)
             * (
                 1
-                + (jnp.sqrt(5) * d / rho)
-                + (5 * jnp.pow(d, 2) / (3 * (rho**2)))
+                + (jnp.sqrt(5) * d / ell)
+                + (5 * jnp.pow(d, 2) / (3 * (ell**2)))
             )
-            * jnp.exp(-((jnp.sqrt(5) * d / rho)))
+            * jnp.exp(-((jnp.sqrt(5) * d / ell)))
         )

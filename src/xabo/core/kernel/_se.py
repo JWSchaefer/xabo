@@ -25,13 +25,13 @@ class SquaredExponential(Kernel, Generic[R, S]):
         x_tick: KernelInputB,
     ) -> KernelOutput:
 
-        ell: R = params.ell
-        sigma: S = params.sigma
+        ell = params.ell
+        sigma = params.sigma
 
         diff = x[..., :, None, :] - x_tick[..., None, :, :]
 
-        sqdist = jnp.sum(jnp.pow(diff, 2), axis=-1)
+        sqdist = jnp.sum(jnp.pow(diff / ell, 2), axis=-1)
 
-        out = sigma * jnp.exp(-0.5 * sqdist / (ell**2))
+        out = sigma * jnp.exp(-0.5 * sqdist)
 
         return out

@@ -19,10 +19,9 @@ from ..transform import Log
 from ._parameter import Parameter
 from ._state import State
 
-P = TypeVar('P')  # Params type
-S = TypeVar('S')  # State type
+P = TypeVar('P')
+S = TypeVar('S')
 
-# Caches for generated classes
 _params_class_cache: dict[type, type] = {}
 _state_class_cache: dict[type, type] = {}
 
