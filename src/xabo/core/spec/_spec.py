@@ -17,7 +17,7 @@ import jax.tree_util
 from jax import Array
 
 from ..prior import Prior
-from ..transform import Log
+from ..transform import Identity
 from ..transform._transform import Transform
 from ._parameter import Parameter
 from ._state import State
@@ -222,7 +222,7 @@ class SpecMeta(ABCMeta):
                 Transform,
                 'Transforms',
                 _transforms_class_cache,
-                default_factory=Log,
+                default_factory=Identity,
             ),
         )
 
@@ -510,7 +510,7 @@ class Spec(ABC, Generic[P, S, Pr, Tr], metaclass=SpecMeta):
         Returns:
             Transforms dataclass with named attributes for each parameter.
         """
-        return self._build_attribute_instance('Transforms', 'transform', Log)
+        return self._build_attribute_instance('Transforms', 'transform', Identity)
 
     def _build_attribute_instance(
         self, class_attr: str, attr_name: str, default_factory: Optional[type]

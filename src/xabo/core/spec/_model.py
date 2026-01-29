@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-from dataclasses import dataclass, fields, replace
-from typing import TYPE_CHECKING, Any, Generic
+from dataclasses import dataclass, fields, is_dataclass, replace
+from typing import TYPE_CHECKING, Any, Generic, cast
 
 import jax
 import jax.numpy as jnp
@@ -114,54 +114,49 @@ class Model(Generic[P, S, Pr, Tr]):
         Returns dict (not dataclass) for flexibility in optimization.
         """
         transforms = self.spec.get_transforms()
-        params_dict = self._dataclass_to_dict(self.params)
-        return self._apply_transforms_dict(
-            params_dict, transforms, inverse=True
-        )
+        return self._apply_transforms(self.params, transforms, inverse=True)
 
     def from_unconstrained(self, raw_params: dict) -> Model[P, S, Pr, Tr]:
         """Return new Model with params transformed from unconstrained space."""
         transforms = self.spec.get_transforms()
-        constrained_dict = self._apply_transforms_dict(
+        constrained_dict = self._apply_transforms(
             raw_params, transforms, inverse=False
         )
         constrained = self.spec._dict_to_params(constrained_dict)
         return self.replace_params(constrained)
 
-    def _apply_transforms_dict(
-        self, params: dict, transforms: dict, inverse: bool
+    def _apply_transforms(
+        self, params: P | dict, transforms: Tr, inverse: bool
     ) -> dict:
-        """Apply transforms to params dict."""
-        result = {}
-        for name, value in params.items():
-            transform = transforms.get(name)
+        """Apply transforms to params.
 
-            if transform is None:
-                result[name] = value
-            elif isinstance(transform, dict):
+        Args:
+            params: Params dataclass or dict of param values
+            transforms: Transforms dataclass instance
+            inverse: If True, apply inverse transform (constrained -> unconstrained)
+
+        Returns:
+            Dict of transformed values (for optimization flexibility)
+        """
+        result = {}
+
+        # Handle both dataclass and dict input for params
+        if is_dataclass(params):
+            items = [(f.name, getattr(params, f.name)) for f in fields(params)]
+        else:
+            items = cast(dict, params).items()
+
+        for name, value in items:
+            transform = getattr(transforms, name)
+
+            if is_dataclass(transform):
                 # Nested spec - recurse
-                result[name] = self._apply_transforms_dict(
-                    value, transform, inverse
-                )
-            elif isinstance(transform, Transform):
-                if inverse:
-                    result[name] = transform.inverse(value)
-                else:
-                    result[name] = transform.forward(value)
+                result[name] = self._apply_transforms(value, transform, inverse)
+            elif inverse:
+                result[name] = transform.inverse(value)
             else:
-                result[name] = value
+                result[name] = transform.forward(value)
 
-        return result
-
-    def _dataclass_to_dict(self, obj: Any) -> dict:
-        """Recursively convert dataclass to nested dict."""
-        result = {}
-        for f in fields(obj):
-            value = getattr(obj, f.name)
-            if hasattr(value, '__dataclass_fields__'):
-                result[f.name] = self._dataclass_to_dict(value)
-            else:
-                result[f.name] = value
         return result
 
     def log_prior(self, unconstrained_params: dict) -> Scalar:
@@ -180,16 +175,27 @@ class Model(Generic[P, S, Pr, Tr]):
 
         return prior_lp + jacobian
 
-    def _eval_priors(self, constrained_params: dict, priors: dict) -> Scalar:
-        """Evaluate priors in constrained space."""
+    def _eval_priors(self, constrained_params: dict, priors: Pr) -> Scalar:
+        """Evaluate priors in constrained space.
+
+        Args:
+            constrained_params: Dict of constrained parameter values
+            priors: Priors dataclass instance
+
+        Returns:
+            Sum of log prior probabilities
+        """
         total = jnp.zeros(())
 
-        for name, value in constrained_params.items():
-            prior = priors.get(name)
+        for f in fields(cast(Any, priors)):
+            name = f.name
+            value = constrained_params.get(name)
+            prior = getattr(priors, name)
 
-            if prior is None:
+            if prior is None or value is None:
                 continue
-            elif isinstance(prior, dict):
+            elif is_dataclass(prior):
+                # Nested priors - recurse
                 total = total + self._eval_priors(value, prior)
             else:
                 total = total + prior.log_prob(value)
@@ -197,20 +203,30 @@ class Model(Generic[P, S, Pr, Tr]):
         return total
 
     def _log_det_jacobian(
-        self, unconstrained_params: dict, transforms: dict
+        self, unconstrained_params: dict, transforms: Tr
     ) -> Scalar:
-        """Sum of log|det J| for all transforms."""
+        """Sum of log|det J| for all transforms.
+
+        Args:
+            unconstrained_params: Dict of unconstrained parameter values
+            transforms: Transforms dataclass instance
+
+        Returns:
+            Sum of log determinant of Jacobians
+        """
         total = jnp.zeros(())
 
-        for name, value in unconstrained_params.items():
-            transform = transforms.get(name)
+        for f in fields(cast(Any, transforms)):
+            name = f.name
+            value = unconstrained_params.get(name)
+            transform = getattr(transforms, name)
 
-            if transform is None:
+            if value is None:
                 continue
-            elif isinstance(transform, dict):
+            elif is_dataclass(transform):
                 # Nested - recurse
                 total = total + self._log_det_jacobian(value, transform)
-            elif isinstance(transform, Transform):
+            else:
                 total = total + transform.log_det_jacobian(value)
 
         return total
