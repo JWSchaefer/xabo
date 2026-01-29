@@ -338,6 +338,14 @@ class Spec(ABC, Generic[P, S], metaclass=SpecMeta):
         hints = get_type_hints(self.__class__)
         result = {}
 
+        # Build TypeVar -> actual type mapping from __orig_class__
+        typevar_map: dict[TypeVar, type] = {}
+        orig_class = getattr(self, '__orig_class__', None)
+        if orig_class is not None:
+            type_params = getattr(self.__class__, '__parameters__', ())
+            type_args = get_args(orig_class)
+            typevar_map = dict(zip(type_params, type_args))
+
         for name, ann in hints.items():
             origin = get_origin(ann) or ann
 
@@ -345,6 +353,15 @@ class Spec(ABC, Generic[P, S], metaclass=SpecMeta):
                 value = extractor(origin)
                 if include_none or value is not None:
                     result[name] = value
+
+            elif isinstance(origin, TypeVar):
+                # Resolve TypeVar to actual type from generic parameterization
+                actual_type = typevar_map.get(origin)
+                if actual_type is not None and isinstance(actual_type, type):
+                    if issubclass(actual_type, Parameter):
+                        value = extractor(actual_type)
+                        if include_none or value is not None:
+                            result[name] = value
 
             elif isinstance(origin, type) and issubclass(origin, Spec):
                 nested_spec = getattr(self, name)

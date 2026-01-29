@@ -1,9 +1,11 @@
 from dataclasses import dataclass
-from typing import Generic
+from typing import Generic, Optional, Tuple
 
 import jax.numpy as jnp
 import jax.random as jr
-from jax import Array
+from jax._src.core import typecheck
+from jax.random import PRNGKey
+from jaxtyping import Array
 
 from .._types import S, Scalar, T
 from ._prior import Prior
@@ -33,14 +35,24 @@ class LogNormal(Prior[T], Generic[T, S]):
             - 0.5 * jnp.log(2 * jnp.pi)
             - 0.5 * ((log_x - self.mu) / self.sigma) ** 2
         )
-        return jnp.sum(element_log_prob)
+        return jnp.sum(
+            element_log_prob,
+            axis=None
+            if jnp.asarray(value).shape[-1] == jnp.asarray(self.mu)[0]
+            else -1,
+        )
 
-    def sample(self, rng_key, shape=()) -> Array:
-        """Sample from prior (returns constrained value).
-
-        Args:
-            rng_key: JAX random key
-            shape: Output shape (default: scalar)
+    def sample(
+        self,
+        rng_key: Array,
+        shape: Optional[Tuple[int, ...]] = None,
+    ) -> Array:
         """
-        z = jr.normal(rng_key, shape=shape)
+        Sample from prior (returns constrained value).
+        """
+        z = jr.normal(
+            rng_key,
+            shape=(shape if shape is not None else tuple())
+            + jnp.asarray(self.mu).shape,
+        )
         return jnp.exp(self.mu + self.sigma * z)

@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from typing import Generic
+from typing import Generic, Optional, Tuple
 
 from jax import Array
 
@@ -18,7 +18,11 @@ class Prior(ABC, Generic[T]):
         ...
 
     @abstractmethod
-    def sample(self, rng_key, shape=()) -> Array:
+    def sample(
+        self,
+        rng_key: Array,
+        shape: Optional[Tuple[int, ...]],
+    ) -> Array:
         """Sample from prior (returns constrained value).
 
         Args:
