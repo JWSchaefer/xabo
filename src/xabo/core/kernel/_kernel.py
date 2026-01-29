@@ -1,17 +1,13 @@
 from abc import ABC, abstractmethod
-from typing import TypeVar
 
 from beartype import beartype
 
-from ..spec import Spec
+from ..spec._spec import P, Pr, S, Spec, Tr
 from ._types import KernelInputA, KernelInputB, KernelOutput
-
-P = TypeVar('P')
-S = TypeVar('S')
 
 
 @beartype
-class Kernel(Spec[P, S], ABC):
+class Kernel(Spec[P, S, Pr, Tr], ABC):
     @abstractmethod
     def __call__(
         self,

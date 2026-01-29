@@ -3,11 +3,10 @@ from typing import Generic, Optional, Tuple
 
 import jax.numpy as jnp
 import jax.random as jr
-from jax._src.core import typecheck
-from jax.random import PRNGKey
 from jaxtyping import Array
 
 from .._types import S, Scalar, T
+from ..typing._typecheck import typecheck
 from ._prior import Prior
 
 
@@ -15,14 +14,13 @@ from ._prior import Prior
 class LogNormal(Prior[T], Generic[T, S]):
     """Log-normal prior: log(X) ~ Normal(mu, sigma).
 
-    Generic over T (mu/output type) and S (sigma type) to support:
-    - LogNormal[Float[Array, 'D'], float] - vector means, shared sigma
-    - LogNormal[float, Float[Array, 'D']] - scalar mean, vector sigma
+    Generic over T (mu/output type) and S (sigma type)
     """
 
     mu: T
     sigma: S
 
+    @typecheck
     def log_prob(self, value: T) -> Scalar:
         """Log probability density at value in constrained space.
 
@@ -42,6 +40,7 @@ class LogNormal(Prior[T], Generic[T, S]):
             else -1,
         )
 
+    @typecheck
     def sample(
         self,
         rng_key: Array,

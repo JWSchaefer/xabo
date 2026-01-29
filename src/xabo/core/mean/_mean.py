@@ -2,12 +2,12 @@ from abc import ABC, abstractmethod
 
 from beartype import beartype
 
-from ..spec import Spec
-from ._types import MeanVector, P, S
+from ..spec._spec import P, Pr, S, Spec, Tr
+from ._types import MeanVector
 
 
 @beartype
-class Mean(Spec[P, S], ABC):
+class Mean(Spec[P, S, Pr, Tr], ABC):
     @abstractmethod
     def __call__(
         self,

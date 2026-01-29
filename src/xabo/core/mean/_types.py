@@ -1,7 +1,5 @@
-from typing import TypeAlias, TypeVar
+from typing import TypeAlias
 
 from jaxtyping import Array, Float
 
-P = TypeVar('P')
-S = TypeVar('S')
 MeanVector: TypeAlias = Float[Array, '*S X']

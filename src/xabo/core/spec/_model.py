@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, fields, replace
-from typing import TYPE_CHECKING, Any, Generic, TypeVar
+from typing import TYPE_CHECKING, Any, Generic
 
 import jax
 import jax.numpy as jnp
@@ -10,27 +10,25 @@ from xabo.core._types import Scalar
 
 from ..transform import Transform
 from ._params_structure import ParamsStructure
+from ._spec import P, Pr, S, Tr
 
 if TYPE_CHECKING:
     from ._spec import Spec
 
-P = TypeVar('P')
-S = TypeVar('S')
-
 
 @jax.tree_util.register_pytree_node_class
 @dataclass(frozen=True)
-class Model(Generic[P, S]):
+class Model(Generic[P, S, Pr, Tr]):
     """
     Immutable container binding a Spec with typed params and state.
     """
 
-    spec: Spec[P, S]
+    spec: Spec[P, S, Pr, Tr]
     params: P
     state: S
 
     @classmethod
-    def from_spec(cls, spec: Spec[P, S]) -> Model[P, S]:
+    def from_spec(cls, spec: Spec[P, S, Pr, Tr]) -> Model[P, S, Pr, Tr]:
         """Create Model from an instantiated Spec."""
         return cls(
             spec=spec,
@@ -38,11 +36,11 @@ class Model(Generic[P, S]):
             state=spec.init_state(),
         )
 
-    def replace_params(self, params: P) -> Model[P, S]:
+    def replace_params(self, params: P) -> Model[P, S, Pr, Tr]:
         """Return new Model with updated params."""
         return replace(self, params=params)
 
-    def replace_state(self, state: S) -> Model[P, S]:
+    def replace_state(self, state: S) -> Model[P, S, Pr, Tr]:
         """Return new Model with updated state."""
         return replace(self, state=state)
 
@@ -80,7 +78,7 @@ class Model(Generic[P, S]):
 
     def unflatten_params(
         self, flat: jnp.ndarray, structure: ParamsStructure
-    ) -> Model[P, S]:
+    ) -> Model[P, S, Pr, Tr]:
         """Reconstruct Model with params from a 1D array.
 
         Args:
@@ -115,15 +113,15 @@ class Model(Generic[P, S]):
         Transform current params to unconstrained space.
         Returns dict (not dataclass) for flexibility in optimization.
         """
-        transforms = self.spec._get_transforms()
+        transforms = self.spec.get_transforms()
         params_dict = self._dataclass_to_dict(self.params)
         return self._apply_transforms_dict(
             params_dict, transforms, inverse=True
         )
 
-    def from_unconstrained(self, raw_params: dict) -> Model[P, S]:
+    def from_unconstrained(self, raw_params: dict) -> Model[P, S, Pr, Tr]:
         """Return new Model with params transformed from unconstrained space."""
-        transforms = self.spec._get_transforms()
+        transforms = self.spec.get_transforms()
         constrained_dict = self._apply_transforms_dict(
             raw_params, transforms, inverse=False
         )
@@ -170,16 +168,14 @@ class Model(Generic[P, S]):
         """
         Evaluate log prior with Jacobian correction.
         """
-        transforms = self.spec._get_transforms()
-        constrained = self._apply_transforms_dict(
+        transforms = self.spec.get_transforms()
+        constrained = self._apply_transforms(
             unconstrained_params, transforms, inverse=False
         )
 
-        # Evaluate prior in constrained space
-        priors = self.spec._get_priors()
+        priors = self.spec.get_priors()
         prior_lp = self._eval_priors(constrained, priors)
 
-        # Add Jacobian correction
         jacobian = self._log_det_jacobian(unconstrained_params, transforms)
 
         return prior_lp + jacobian
@@ -194,10 +190,8 @@ class Model(Generic[P, S]):
             if prior is None:
                 continue
             elif isinstance(prior, dict):
-                # Nested - recurse
                 total = total + self._eval_priors(value, prior)
             else:
-                # Prior instance
                 total = total + prior.log_prob(value)
 
         return total
