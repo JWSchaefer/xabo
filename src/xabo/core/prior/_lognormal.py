@@ -1,22 +1,25 @@
 from dataclasses import dataclass
+from typing import Generic
 
 import jax.numpy as jnp
 import jax.random as jr
 from jax import Array
 
-from .._types import Scalar, T
+from .._types import S, Scalar, T
 from ._prior import Prior
 
 
 @dataclass(frozen=True)
-class LogNormal(Prior[T]):
+class LogNormal(Prior[T], Generic[T, S]):
     """Log-normal prior: log(X) ~ Normal(mu, sigma).
 
-    Suitable for positive parameters like lengthscales and variances.
+    Generic over T (mu/output type) and S (sigma type) to support:
+    - LogNormal[Float[Array, 'D'], float] - vector means, shared sigma
+    - LogNormal[float, Float[Array, 'D']] - scalar mean, vector sigma
     """
 
-    mu: float = 0.0
-    sigma: float = 1.0
+    mu: T
+    sigma: S
 
     def log_prob(self, value: T) -> Scalar:
         """Log probability density at value in constrained space.

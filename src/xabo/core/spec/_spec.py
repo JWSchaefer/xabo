@@ -48,10 +48,12 @@ def _generate_params_class(spec_cls: type) -> type:
             fields.append((name, inner_type))
 
         elif isinstance(origin, TypeVar):
-            # Handle TypeVars bound to Parameter
+            # Handle TypeVars bound to Parameter (including Parameter[Any])
             bound = getattr(origin, '__bound__', None)
-            if bound is not None and issubclass(bound, Parameter):
-                fields.append((name, Any))
+            if bound is not None:
+                bound_origin = get_origin(bound) or bound
+                if isinstance(bound_origin, type) and issubclass(bound_origin, Parameter):
+                    fields.append((name, Any))
 
         elif isinstance(origin, type) and issubclass(origin, Spec):
             # Nested Spec - recursively generate its Params class
@@ -232,13 +234,15 @@ class Spec(ABC, Generic[P, S], metaclass=SpecMeta):
 
             elif isinstance(origin, TypeVar):
                 bound = getattr(origin, '__bound__', None)
-                if bound is not None and issubclass(bound, Parameter):
-                    value = getattr(self, name)
-                    if from_prior:
-                        raise NotImplementedError(
-                            'Sampling from priors not yet implemented'
-                        )
-                    params[name] = value
+                if bound is not None:
+                    bound_origin = get_origin(bound) or bound
+                    if isinstance(bound_origin, type) and issubclass(bound_origin, Parameter):
+                        value = getattr(self, name)
+                        if from_prior:
+                            raise NotImplementedError(
+                                'Sampling from priors not yet implemented'
+                            )
+                        params[name] = value
 
             elif isinstance(origin, type) and issubclass(origin, Spec):
                 nested_spec = getattr(self, name)
