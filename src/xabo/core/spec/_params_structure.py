@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 from dataclasses import dataclass
 from typing import Any
 
@@ -20,7 +18,6 @@ class ParamsStructure:
 
     @staticmethod
     def _prod(shape: tuple[int, ...]) -> int:
-        """Product of shape dimensions."""
         result = 1
         for dim in shape:
             result *= dim

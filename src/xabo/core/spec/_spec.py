@@ -21,33 +21,20 @@ from ..transform._transform import Transform
 from ._parameter import Parameter
 from ._state import State
 
-P = TypeVar("P")
-S = TypeVar("S")
-Tr = TypeVar("Tr")
+P = TypeVar('P')
+S = TypeVar('S')
+Tr = TypeVar('Tr')
 
 _params_class_cache: dict[type, type] = {}
 _state_class_cache: dict[type, type] = {}
 _transforms_class_cache: dict[type, type] = {}
-_prior_class: list = []  # Cached Prior class to avoid repeated imports
 
-_GENERATED_ATTRS = ("Params", "State", "Transforms")
-
-
-def _get_prior_class():
-    """Get the cached Prior class, importing lazily if needed."""
-    if not _prior_class:
-        try:
-            from ..prior import Prior
-
-            _prior_class.append(Prior)
-        except ImportError:
-            _prior_class.append(object)
-    return _prior_class[0]
+_GENERATED_ATTRS = ('Params', 'State', 'Transforms')
 
 
 def _is_spec_bound(tv: TypeVar) -> bool:
     """Check if a TypeVar is bounded to Spec (including Prior)."""
-    bound = getattr(tv, "__bound__", None)
+    bound = getattr(tv, '__bound__', None)
     if bound is None:
         return False
     bound_origin = get_origin(bound) or bound
@@ -56,11 +43,13 @@ def _is_spec_bound(tv: TypeVar) -> bool:
 
 def _is_parameter_bound(tv: TypeVar) -> bool:
     """Check if a TypeVar is bounded to Parameter."""
-    bound = getattr(tv, "__bound__", None)
+    bound = getattr(tv, '__bound__', None)
     if bound is None:
         return False
     bound_origin = get_origin(bound) or bound
-    return isinstance(bound_origin, type) and issubclass(bound_origin, Parameter)
+    return isinstance(bound_origin, type) and issubclass(
+        bound_origin, Parameter
+    )
 
 
 def _generate_params_class(spec_cls: type) -> type:
@@ -93,7 +82,7 @@ def _generate_params_class(spec_cls: type) -> type:
             nested_params = _generate_params_class(origin)
             fields.append((name, nested_params))
 
-    class_name = f"{spec_cls.__name__}Params"
+    class_name = f'{spec_cls.__name__}Params'
     ParamsClass = make_dataclass(class_name, fields, frozen=True)
 
     # Register as JAX PyTree
@@ -133,7 +122,7 @@ def _generate_state_class(spec_cls: type) -> type:
             if dataclass_fields(nested_state):
                 fields.append((name, nested_state))
 
-    class_name = f"{spec_cls.__name__}State"
+    class_name = f'{spec_cls.__name__}State'
     StateClass = make_dataclass(class_name, fields, frozen=True)
 
     # Register as JAX PyTree
@@ -181,7 +170,7 @@ def _generate_transforms_class(spec_cls: type) -> type:
                 # Even empty, include for consistency
                 fields.append((name, nested_transforms))
 
-    class_name = f"{spec_cls.__name__}Transforms"
+    class_name = f'{spec_cls.__name__}Transforms'
     TransformsClass = make_dataclass(class_name, fields, frozen=True)
 
     _transforms_class_cache[spec_cls] = TransformsClass
@@ -197,16 +186,13 @@ class SpecMeta(ABCMeta):
         cls = super().__new__(mcs, name, bases, namespace, **kwargs)
 
         # Skip base classes (Spec, Prior)
-        if name in ("Spec", "Prior"):
+        if name in ('Spec', 'Prior'):
             return cls
 
-        # Ensure Prior class is cached for later use
-        _get_prior_class()
-
         # Generate and attach Params/State/Transforms classes
-        setattr(cls, "Params", _generate_params_class(cls))
-        setattr(cls, "State", _generate_state_class(cls))
-        setattr(cls, "Transforms", _generate_transforms_class(cls))
+        setattr(cls, 'Params', _generate_params_class(cls))
+        setattr(cls, 'State', _generate_state_class(cls))
+        setattr(cls, 'Transforms', _generate_transforms_class(cls))
 
         return cls
 
@@ -265,7 +251,9 @@ class Spec(ABC, Generic[P, S, Tr], metaclass=SpecMeta):
         # Check for unexpected arguments
         unexpected = set(kwargs) - expected
         if unexpected:
-            raise TypeError(f"Unexpected argument(s): {', '.join(sorted(unexpected))}")
+            raise TypeError(
+                f"Unexpected argument(s): {', '.join(sorted(unexpected))}"
+            )
 
         for name, ann in hints.items():
             # Skip class attributes set by metaclass
@@ -283,7 +271,7 @@ class Spec(ABC, Generic[P, S, Tr], metaclass=SpecMeta):
             elif isinstance(origin, type) and issubclass(origin, State):
                 setattr(self, name, None)
             else:
-                raise TypeError(f"Missing required argument: {name}")
+                raise TypeError(f'Missing required argument: {name}')
 
     def init_params(self, rng: Optional[Array] = None) -> P:
         """Extract parameter values into a typed Params pytree.
@@ -291,76 +279,30 @@ class Spec(ABC, Generic[P, S, Tr], metaclass=SpecMeta):
         Returns:
             Typed Params dataclass with named attribute access.
         """
-        params_dict = self._collect_params_dict(rng)
-        return self._dict_to_params(params_dict)
-
-    def _collect_params_dict(
-        self, rng: Optional[Array] = None, from_prior: bool = False
-    ) -> dict:
-        """Collect parameter values into a dict."""
-        if from_prior and rng is None:
-            raise ValueError("rng required when from_prior=True")
-
         hints = get_type_hints(self.__class__)
         params = {}
 
         for name, ann in hints.items():
-            # Skip class attributes
             if name in _GENERATED_ATTRS:
                 continue
 
             origin = get_origin(ann) or ann
 
             if isinstance(origin, type) and issubclass(origin, Parameter):
-                value = getattr(self, name)
-                if from_prior:
-                    raise NotImplementedError(
-                        "Sampling from priors not yet implemented"
-                    )
-                params[name] = value
+                params[name] = getattr(self, name)
 
             elif isinstance(origin, TypeVar):
                 if _is_parameter_bound(origin):
-                    # Parameter-bounded TypeVar - leaf value
-                    value = getattr(self, name)
-                    params[name] = value
+                    params[name] = getattr(self, name)
                 elif _is_spec_bound(origin):
-                    # Spec/Prior-bounded TypeVar - recurse
                     nested_spec = getattr(self, name)
-                    params[name] = nested_spec._collect_params_dict(rng, from_prior)
+                    params[name] = nested_spec.init_params(rng)
 
             elif isinstance(origin, type) and issubclass(origin, Spec):
                 nested_spec = getattr(self, name)
-                params[name] = nested_spec._collect_params_dict(rng, from_prior)
+                params[name] = nested_spec.init_params(rng)
 
-        return params
-
-    def _dict_to_params(self, params_dict: dict) -> P:
-        """Convert nested dict to typed Params dataclass."""
-        hints = get_type_hints(self.__class__)
-        converted = {}
-
-        for name, value in params_dict.items():
-            ann = hints.get(name)
-            if ann is None:
-                converted[name] = value
-                continue
-
-            origin = get_origin(ann) or ann
-
-            if isinstance(origin, type) and issubclass(origin, Spec):
-                nested_spec = getattr(self, name)
-                converted[name] = nested_spec._dict_to_params(value)
-            elif isinstance(origin, TypeVar):
-                if _is_spec_bound(origin):
-                    nested_spec = getattr(self, name)
-                    converted[name] = nested_spec._dict_to_params(value)
-                else:
-                    converted[name] = value
-            else:
-                converted[name] = value
-
-        return self.__class__.Params(**converted)
+        return self.__class__.Params(**params)
 
     def init_state(self) -> S:
         """Generate typed State pytree with None placeholders.
@@ -427,7 +369,7 @@ class Spec(ABC, Generic[P, S, Tr], metaclass=SpecMeta):
         For Prior fields, the Prior's get_transforms() handles
         using the Prior's class-level transform for its value field.
         """
-        transforms_cls = getattr(self.__class__, "Transforms")
+        transforms_cls = getattr(self.__class__, 'Transforms')
         hints = get_type_hints(self.__class__)
         values = {}
 
@@ -462,14 +404,15 @@ class Spec(ABC, Generic[P, S, Tr], metaclass=SpecMeta):
         return transforms_cls(**values)
 
     @classmethod
-    def to_spec(cls: Type["Spec"]) -> dict:
+    def to_spec(cls: Type['Spec']) -> dict:
         """Extract type specification from class annotations.
 
         Returns:
             Dict mapping field names to their type markers (Parameter/State/nested Spec).
         """
         return {
-            name: cls._from_annotation(ann) for name, ann in get_type_hints(cls).items()
+            name: cls._from_annotation(ann)
+            for name, ann in get_type_hints(cls).items()
         }
 
     @classmethod
@@ -483,11 +426,11 @@ class Spec(ABC, Generic[P, S, Tr], metaclass=SpecMeta):
         if isinstance(origin, type) and issubclass(origin, Spec):
             return origin.to_structure_from_args(args)
 
-        raise TypeError(f"Unsupported annotation {ann}")
+        raise TypeError(f'Unsupported annotation {ann}')
 
     @classmethod
     def to_structure_from_args(cls, args):
-        type_vars = getattr(cls, "__parameters__", ())
+        type_vars = getattr(cls, '__parameters__', ())
         tv_map: dict[TypeVar, Type] = dict(zip(type_vars, args))
 
         def substitute(ann):
@@ -504,4 +447,7 @@ class Spec(ABC, Generic[P, S, Tr], metaclass=SpecMeta):
             name: substitute(ann) for name, ann in get_type_hints(cls).items()
         }
 
-        return {name: cls._from_annotation(ann) for name, ann in resolved_hints.items()}
+        return {
+            name: cls._from_annotation(ann)
+            for name, ann in resolved_hints.items()
+        }

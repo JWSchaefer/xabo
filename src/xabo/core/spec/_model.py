@@ -1,13 +1,15 @@
 from __future__ import annotations
 
-from dataclasses import dataclass, fields, is_dataclass, replace
-from typing import Any, Generic, cast
+from dataclasses import dataclass, fields, replace
+from typing import Any, Generic
 
 import jax
 import jax.numpy as jnp
 
 from xabo.core._types import Scalar
 
+from ..prior._prior import Prior
+from ..transform._transform import Transform
 from ._params_structure import ParamsStructure
 from ._spec import P, S, Spec, Tr
 
@@ -99,60 +101,52 @@ class Model(Generic[P, S, Tr]):
         params = jax.tree_util.tree_unflatten(structure.treedef, leaves)
         return self.replace_params(params)
 
-    def to_unconstrained(self) -> dict:
-        """
-        Transform current params to unconstrained space.
-        Returns dict (not dataclass) for flexibility in optimization.
-        """
+    def to_unconstrained(self) -> P:
+        """Transform current params to unconstrained space."""
         transforms = self.spec.get_transforms()
         return self._apply_transforms(self.params, transforms, inverse=True)
 
-    def from_unconstrained(self, raw_params: dict) -> Model[P, S, Tr]:
+    def from_unconstrained(self, raw_params: P) -> Model[P, S, Tr]:
         """Return new Model with params transformed from unconstrained space."""
         transforms = self.spec.get_transforms()
-        constrained_dict = self._apply_transforms(
+        constrained = self._apply_transforms(
             raw_params, transforms, inverse=False
         )
-        constrained = self.spec._dict_to_params(constrained_dict)
         return self.replace_params(constrained)
 
     def _apply_transforms(
-        self, params: P | dict, transforms: Tr, inverse: bool
-    ) -> dict:
+        self, params: Any, transforms: Any, inverse: bool
+    ) -> Any:
         """Apply transforms to params.
 
         Args:
-            params: Params dataclass or dict of param values
+            params: Params dataclass instance
             transforms: Transforms dataclass instance
             inverse: If True, apply inverse transform (constrained -> unconstrained)
 
         Returns:
-            Dict of transformed values (for optimization flexibility)
+            New Params dataclass with transformed values
         """
         result = {}
 
-        # Handle both dataclass and dict input for params
-        if is_dataclass(params):
-            items = [(f.name, getattr(params, f.name)) for f in fields(params)]
-        else:
-            items = cast(dict, params).items()
-
-        for name, value in items:
+        for f in fields(params):
+            name = f.name
+            value = getattr(params, name)
             transform = getattr(transforms, name)
 
-            if is_dataclass(transform):
-                # Nested spec - recurse
+            if isinstance(transform, Transform):
+                if inverse:
+                    result[name] = transform.inverse(value)
+                else:
+                    result[name] = transform.forward(value)
+            else:
                 result[name] = self._apply_transforms(
                     value, transform, inverse
                 )
-            elif inverse:
-                result[name] = transform.inverse(value)
-            else:
-                result[name] = transform.forward(value)
 
-        return result
+        return type(params)(**result)
 
-    def log_prior(self, unconstrained_params: dict) -> Scalar:
+    def log_prior(self, unconstrained_params: P) -> Scalar:
         """
         Evaluate log prior with Jacobian correction.
 
@@ -160,10 +154,9 @@ class Model(Generic[P, S, Tr]):
         evaluates their log_prob on constrained parameter values.
         """
         transforms = self.spec.get_transforms()
-        constrained_dict = self._apply_transforms(
+        constrained_params = self._apply_transforms(
             unconstrained_params, transforms, inverse=False
         )
-        constrained_params = self.spec._dict_to_params(constrained_dict)
 
         prior_lp = self._eval_priors(self.spec, constrained_params)
 
@@ -185,8 +178,6 @@ class Model(Generic[P, S, Tr]):
         Returns:
             Sum of all log prior probabilities
         """
-        from ..prior._prior import Prior
-
         total = jnp.zeros(())
 
         for f in fields(params):
@@ -214,12 +205,12 @@ class Model(Generic[P, S, Tr]):
         return total
 
     def _log_det_jacobian(
-        self, unconstrained_params: dict, transforms: Tr
+        self, unconstrained_params: Any, transforms: Any
     ) -> Scalar:
         """Sum of log|det J| for all transforms.
 
         Args:
-            unconstrained_params: Dict of unconstrained parameter values
+            unconstrained_params: Params dataclass of unconstrained values
             transforms: Transforms dataclass instance
 
         Returns:
@@ -227,22 +218,17 @@ class Model(Generic[P, S, Tr]):
         """
         total = jnp.zeros(())
 
-        for f in fields(cast(Any, transforms)):
+        for f in fields(transforms):
             name = f.name
-            value = unconstrained_params.get(name)
+            value = getattr(unconstrained_params, name)
             transform = getattr(transforms, name)
 
-            if value is None:
-                continue
-            elif is_dataclass(transform):
-                # Nested - recurse
-                total = total + self._log_det_jacobian(value, transform)
-            else:
+            if isinstance(transform, Transform):
                 total = total + transform.log_det_jacobian(value)
+            else:
+                total = total + self._log_det_jacobian(value, transform)
 
         return total
-
-    # --- Delegation ---
 
     def __call__(self, *args, **kwargs) -> Any:
         if not callable(self.spec):
