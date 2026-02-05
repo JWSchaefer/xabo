@@ -2,7 +2,7 @@ from typing import Callable, TypeVar
 
 from xabo import config
 
-F = TypeVar('F', bound=Callable)
+F = TypeVar("F", bound=Callable)
 
 
 def typecheck(func: F) -> F:
@@ -10,7 +10,7 @@ def typecheck(func: F) -> F:
     Apply @jaxtyped(typechecker=beartype) iff TYPECHECKING_ENABLED is True.
     Otherwise return the function unchanged.
     """
-    if not config.get('runtime_typechecking', True):
+    if not config.get("runtime_typechecking", True):
         return func
 
     from beartype import beartype

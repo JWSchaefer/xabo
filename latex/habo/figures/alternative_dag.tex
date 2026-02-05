@@ -1,0 +1,26 @@
+\begin{figure}[H]
+	\centering
+	\begin{tikzpicture}
+		\GraphInit[vstyle=Classic]
+		\tikzset{EdgeStyle/.style={->,>=latex}}
+		\SetGraphUnit{2}
+		%\draw[help lines] (0,0) grid (9,2);
+		\Vertex[x=0,y=0,Lpos=-90,L={$f_1$}]{f1}
+		\Vertex[x=4.5,y=3,Lpos=-90,L={$f_2$}]{f2}
+		\Vertex[x=4.5,y=1,Lpos=-90,L={$f_3$}]{f3}
+		\Vertex[x=4.5,y=-1,Lpos=-90,L={$f_4$}]{f4}
+		\Vertex[x=4.5,y=-3,Lpos=-90,L={$f_{L-1}$}]{flm1}
+		\Vertex[x=9,y=0,Lpos=-90,L={$f_L$}]{fl}
+		\node at (4.5,-2.2) {$\vdots$};
+		\Edge[label={$\varrho_{12} \delta_{12} $}](f1)(f2)
+		\Edge[label={$\varrho_{13} \delta_{13} $}](f1)(f3)
+		\Edge[label={$\varrho_{14} \delta_{14} $}](f1)(f4)
+		\Edge[label={$\varrho_{1L-1} \delta_{1L-1} $}](f1)(flm1)
+		\Edge[label={$\varrho_{2L} \delta_{2L} $}](f2)(fl)
+		\Edge[label={$\varrho_{3L} \delta_{3L} $}](f3)(fl)
+		\Edge[label={$\varrho_{4L} \delta_{4L} $}](f4)(fl)
+		\Edge[label={$\varrho_{L-1L} \delta_{L-1L} $}](flm1)(fl)
+	\end{tikzpicture}
+	\caption{An alternate hierarchy}
+	\label{fig:counter_example}
+\end{figure}

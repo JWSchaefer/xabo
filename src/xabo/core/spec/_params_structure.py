@@ -6,7 +6,6 @@ from typing import Any
 
 @dataclass(frozen=True)
 class ParamsStructure:
-
     treedef: Any
     shapes: tuple[tuple[int, ...], ...]
     dtypes: tuple[Any, ...]

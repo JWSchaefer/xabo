@@ -1,34 +1,30 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, fields, is_dataclass, replace
-from typing import TYPE_CHECKING, Any, Generic, cast
+from typing import Any, Generic, cast
 
 import jax
 import jax.numpy as jnp
 
 from xabo.core._types import Scalar
 
-from ..transform import Transform
 from ._params_structure import ParamsStructure
-from ._spec import P, Pr, S, Tr
-
-if TYPE_CHECKING:
-    from ._spec import Spec
+from ._spec import P, S, Spec, Tr
 
 
 @jax.tree_util.register_pytree_node_class
 @dataclass(frozen=True)
-class Model(Generic[P, S, Pr, Tr]):
+class Model(Generic[P, S, Tr]):
     """
     Immutable container binding a Spec with typed params and state.
     """
 
-    spec: Spec[P, S, Pr, Tr]
+    spec: Spec[P, S, Tr]
     params: P
     state: S
 
     @classmethod
-    def from_spec(cls, spec: Spec[P, S, Pr, Tr]) -> Model[P, S, Pr, Tr]:
+    def from_spec(cls, spec: Spec[P, S, Tr]) -> Model[P, S, Tr]:
         """Create Model from an instantiated Spec."""
         return cls(
             spec=spec,
@@ -36,15 +32,13 @@ class Model(Generic[P, S, Pr, Tr]):
             state=spec.init_state(),
         )
 
-    def replace_params(self, params: P) -> Model[P, S, Pr, Tr]:
+    def replace_params(self, params: P) -> Model[P, S, Tr]:
         """Return new Model with updated params."""
         return replace(self, params=params)
 
-    def replace_state(self, state: S) -> Model[P, S, Pr, Tr]:
+    def replace_state(self, state: S) -> Model[P, S, Tr]:
         """Return new Model with updated state."""
         return replace(self, state=state)
-
-    # --- Flatten/Unflatten for external optimizers ---
 
     def flatten_params(self) -> tuple[jnp.ndarray, ParamsStructure]:
         """Flatten params to a 1D array for use with external optimizers.
@@ -78,7 +72,7 @@ class Model(Generic[P, S, Pr, Tr]):
 
     def unflatten_params(
         self, flat: jnp.ndarray, structure: ParamsStructure
-    ) -> Model[P, S, Pr, Tr]:
+    ) -> Model[P, S, Tr]:
         """Reconstruct Model with params from a 1D array.
 
         Args:
@@ -96,7 +90,6 @@ class Model(Generic[P, S, Pr, Tr]):
             leaf_flat = flat[offset : offset + size]
             leaf = leaf_flat.reshape(shape).astype(dtype)
 
-            # If original was scalar, extract it
             if shape == (1,):
                 leaf = leaf[0]
 
@@ -106,8 +99,6 @@ class Model(Generic[P, S, Pr, Tr]):
         params = jax.tree_util.tree_unflatten(structure.treedef, leaves)
         return self.replace_params(params)
 
-    # --- Transforms ---
-
     def to_unconstrained(self) -> dict:
         """
         Transform current params to unconstrained space.
@@ -116,7 +107,7 @@ class Model(Generic[P, S, Pr, Tr]):
         transforms = self.spec.get_transforms()
         return self._apply_transforms(self.params, transforms, inverse=True)
 
-    def from_unconstrained(self, raw_params: dict) -> Model[P, S, Pr, Tr]:
+    def from_unconstrained(self, raw_params: dict) -> Model[P, S, Tr]:
         """Return new Model with params transformed from unconstrained space."""
         transforms = self.spec.get_transforms()
         constrained_dict = self._apply_transforms(
@@ -151,7 +142,9 @@ class Model(Generic[P, S, Pr, Tr]):
 
             if is_dataclass(transform):
                 # Nested spec - recurse
-                result[name] = self._apply_transforms(value, transform, inverse)
+                result[name] = self._apply_transforms(
+                    value, transform, inverse
+                )
             elif inverse:
                 result[name] = transform.inverse(value)
             else:
@@ -162,43 +155,61 @@ class Model(Generic[P, S, Pr, Tr]):
     def log_prior(self, unconstrained_params: dict) -> Scalar:
         """
         Evaluate log prior with Jacobian correction.
+
+        Traverses the Spec tree to find all Prior instances and
+        evaluates their log_prob on constrained parameter values.
         """
         transforms = self.spec.get_transforms()
-        constrained = self._apply_transforms(
+        constrained_dict = self._apply_transforms(
             unconstrained_params, transforms, inverse=False
         )
+        constrained_params = self.spec._dict_to_params(constrained_dict)
 
-        priors = self.spec.get_priors()
-        prior_lp = self._eval_priors(constrained, priors)
+        prior_lp = self._eval_priors(self.spec, constrained_params)
 
         jacobian = self._log_det_jacobian(unconstrained_params, transforms)
 
         return prior_lp + jacobian
 
-    def _eval_priors(self, constrained_params: dict, priors: Pr) -> Scalar:
-        """Evaluate priors in constrained space.
+    def _eval_priors(self, spec: 'Spec', params: Any) -> Scalar:
+        """Recursively evaluate all priors in the Spec tree.
+
+        Walks the Spec tree and typed params in parallel. When a field
+        is a Prior (which is a Spec), evaluates its log_prob and then
+        recurses into its own fields to evaluate nested priors (hyperpriors).
 
         Args:
-            constrained_params: Dict of constrained parameter values
-            priors: Priors dataclass instance
+            spec: Current Spec node in the tree
+            params: Corresponding typed Params dataclass
 
         Returns:
-            Sum of log prior probabilities
+            Sum of all log prior probabilities
         """
+        from ..prior._prior import Prior
+
         total = jnp.zeros(())
 
-        for f in fields(cast(Any, priors)):
+        for f in fields(params):
             name = f.name
-            value = constrained_params.get(name)
-            prior = getattr(priors, name)
+            nested_spec = getattr(spec, name, None)
+            nested_params = getattr(params, name, None)
 
-            if prior is None or value is None:
+            if nested_params is None:
                 continue
-            elif is_dataclass(prior):
-                # Nested priors - recurse
-                total = total + self._eval_priors(value, prior)
-            else:
-                total = total + prior.log_prob(value)
+
+            if isinstance(nested_spec, Prior):
+                # This is a Prior - evaluate its log_prob
+                value = jnp.asarray(nested_params.value)
+                state = nested_spec.init_state()
+                total = total + nested_spec.log_prob(
+                    value, nested_params, state
+                )
+                # Recurse into the Prior's fields for nested priors (hyperpriors)
+                total = total + self._eval_priors(nested_spec, nested_params)
+
+            elif isinstance(nested_spec, Spec):
+                # Non-Prior Spec (e.g., Kernel) - just recurse
+                total = total + self._eval_priors(nested_spec, nested_params)
 
         return total
 

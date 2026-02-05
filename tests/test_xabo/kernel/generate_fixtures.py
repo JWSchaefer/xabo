@@ -30,15 +30,15 @@ def generate_kernel_fixtures(output_path: Path):
             output = kernel(x, y)
 
             # Use kernel name and case id as fixture key
-            fixture_key = f'{kernel_name}_{case_id(case)}'
-            fixtures[f'{fixture_key}_x'] = x
-            fixtures[f'{fixture_key}_y'] = y
-            fixtures[f'{fixture_key}_out'] = output
+            fixture_key = f"{kernel_name}_{case_id(case)}"
+            fixtures[f"{fixture_key}_x"] = x
+            fixtures[f"{fixture_key}_y"] = y
+            fixtures[f"{fixture_key}_out"] = output
 
     jnp.savez(output_path, **fixtures)
 
 
-if __name__ == '__main__':
-    fixtures_dir = Path(__file__).parent / 'fixtures'
+if __name__ == "__main__":
+    fixtures_dir = Path(__file__).parent / "fixtures"
     fixtures_dir.mkdir(parents=True, exist_ok=True)
-    generate_kernel_fixtures(fixtures_dir / 'kernel_expected.npz')
+    generate_kernel_fixtures(fixtures_dir / "kernel_expected.npz")

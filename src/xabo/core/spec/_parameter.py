@@ -1,20 +1,23 @@
-from typing import Generic, Optional
+from __future__ import annotations
 
-from xabo.core.prior import Prior
+from typing import Generic
 
 from .._types import T
-from ..transform._transform import Transform
 
 
 class Parameter(Generic[T]):
-    """Type marker for model parameters.
+    """Pure type marker for terminal leaf parameters.
 
-    Use in type hints to declare parameters:
-        class MyModel(Spec):
-            lengthscale: Parameter[float]
+    Parameters are the terminal leaves of a Spec tree - they hold
+    the actual learnable values. Parameters should not contain
+    hidden structure (priors, transforms, etc.).
 
-    Class attributes define defaults for transform and prior.
+    Use in type hints to declare leaf parameters:
+        class MyPrior(Prior[float]):
+            value: Parameter[float]  # Terminal leaf
+
+    Priors and transforms are now specified at the Prior level,
+    not on Parameters.
     """
 
-    transform: Optional[Transform[T]] = None
-    prior: Optional[Prior[T]] = None
+    pass

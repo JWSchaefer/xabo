@@ -15,8 +15,8 @@ class KernelTestCase:
     exception: Optional[Type[Exception]]
 
 
-def case_id(case: 'KernelTestCase'):
-    return f'{case.shape_one}×{case.shape_two}→{case.shape_out}'
+def case_id(case: "KernelTestCase"):
+    return f"{case.shape_one}×{case.shape_two}→{case.shape_out}"
 
 
 cases = [

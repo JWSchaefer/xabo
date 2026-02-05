@@ -6,9 +6,9 @@ from ._se import SquaredExponential
 
 #
 __all__ = [
-    'Kernel',
-    'SquaredExponential',
-    'Matern12',
-    'Matern32',
-    'Matern52',
+    "Kernel",
+    "SquaredExponential",
+    "Matern12",
+    "Matern32",
+    "Matern52",
 ]

@@ -5,12 +5,13 @@ from xabo.core.kernel import (
     Matern52,
     SquaredExponential,
 )
+from xabo.core.prior import NoPrior
 
 kernels: list[Kernel] = [
-    Matern12(ell=0.1, sigma=0.1),
-    Matern32(ell=0.1, sigma=0.1),
-    Matern52(ell=0.1, sigma=0.1),
-    SquaredExponential(ell=0.1, sigma=0.1),
+    Matern12(ell=NoPrior(value=0.1), sigma=NoPrior(value=0.1)),
+    Matern32(ell=NoPrior(value=0.1), sigma=NoPrior(value=0.1)),
+    Matern52(ell=NoPrior(value=0.1), sigma=NoPrior(value=0.1)),
+    SquaredExponential(ell=NoPrior(value=0.1), sigma=NoPrior(value=0.1)),
 ]
 
 

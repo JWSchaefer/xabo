@@ -3,7 +3,7 @@ from typing import Callable, Optional, Type, TypeVar
 
 import pytest
 
-E = TypeVar('E', bound=Exception)
+E = TypeVar("E", bound=Exception)
 
 
 def raises(exc: Optional[Type[E]]):
