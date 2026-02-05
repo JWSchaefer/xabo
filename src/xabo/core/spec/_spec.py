@@ -25,13 +25,6 @@ P = TypeVar('P')
 S = TypeVar('S')
 Tr = TypeVar('Tr')
 
-_params_class_cache: dict[type, type] = {}
-_state_class_cache: dict[type, type] = {}
-_transforms_class_cache: dict[type, type] = {}
-
-_GENERATED_ATTRS = ('Params', 'State', 'Transforms')
-
-
 def _is_spec_bound(tv: TypeVar) -> bool:
     """Check if a TypeVar is bounded to Spec (including Prior)."""
     bound = getattr(tv, '__bound__', None)
@@ -52,135 +45,14 @@ def _is_parameter_bound(tv: TypeVar) -> bool:
     )
 
 
-def _generate_params_class(spec_cls: type) -> type:
-    """Generate frozen dataclass for a Spec's parameters."""
-    if spec_cls in _params_class_cache:
-        return _params_class_cache[spec_cls]
-
-    hints = get_type_hints(spec_cls)
-    fields = []
-
-    for name, ann in hints.items():
-        # Skip class attributes set by metaclass and Generic type params
-        if name in _GENERATED_ATTRS:
-            continue
-
-        origin = get_origin(ann) or ann
-
-        if isinstance(origin, type) and issubclass(origin, Parameter):
-            inner_type = get_args(ann)[0] if get_args(ann) else Any
-            fields.append((name, inner_type))
-
-        elif isinstance(origin, TypeVar):
-            if _is_parameter_bound(origin) or _is_spec_bound(origin):
-                # Both Parameter-bounded and Spec/Prior-bounded TypeVars
-                # get Any type (resolved at runtime)
-                fields.append((name, Any))
-
-        elif isinstance(origin, type) and issubclass(origin, Spec):
-            # Nested Spec (including Prior) - recursively generate its Params class
-            nested_params = _generate_params_class(origin)
-            fields.append((name, nested_params))
-
-    class_name = f'{spec_cls.__name__}Params'
-    ParamsClass = make_dataclass(class_name, fields, frozen=True)
-
-    # Register as JAX PyTree
-    jax.tree_util.register_dataclass(
-        ParamsClass,
-        data_fields=[f[0] for f in fields],
-        meta_fields=[],
-    )
-
-    _params_class_cache[spec_cls] = ParamsClass
-    return ParamsClass
-
-
-def _generate_state_class(spec_cls: type) -> type:
-    """Generate frozen dataclass for a Spec's state."""
-    if spec_cls in _state_class_cache:
-        return _state_class_cache[spec_cls]
-
-    hints = get_type_hints(spec_cls)
-    fields = []
-
-    for name, ann in hints.items():
-        # Skip class attributes set by metaclass
-        if name in _GENERATED_ATTRS:
-            continue
-
-        origin = get_origin(ann) or ann
-
-        if isinstance(origin, type) and issubclass(origin, State):
-            inner_type = get_args(ann)[0] if get_args(ann) else Any
-            # State fields default to None
-            fields.append((name, Optional[inner_type], None))
-
-        elif isinstance(origin, type) and issubclass(origin, Spec):
-            nested_state = _generate_state_class(origin)
-            # Only include if nested spec has state fields
-            if dataclass_fields(nested_state):
-                fields.append((name, nested_state))
-
-    class_name = f'{spec_cls.__name__}State'
-    StateClass = make_dataclass(class_name, fields, frozen=True)
-
-    # Register as JAX PyTree
-    jax.tree_util.register_dataclass(
-        StateClass,
-        data_fields=[f[0] for f in fields],
-        meta_fields=[],
-    )
-
-    _state_class_cache[spec_cls] = StateClass
-    return StateClass
-
-
-def _generate_transforms_class(spec_cls: type) -> type:
-    """Generate frozen dataclass for a Spec's transforms.
-
-    In the new architecture, transforms come from Prior class attributes,
-    not from Parameter class attributes.
-    """
-    if spec_cls in _transforms_class_cache:
-        return _transforms_class_cache[spec_cls]
-
-    hints = get_type_hints(spec_cls)
-    fields = []
-
-    for name, ann in hints.items():
-        if name in _GENERATED_ATTRS:
-            continue
-
-        origin = get_origin(ann) or ann
-
-        if isinstance(origin, type) and issubclass(origin, Parameter):
-            # Terminal Parameter - always has a transform (Identity by default)
-            fields.append((name, Transform))
-
-        elif isinstance(origin, TypeVar):
-            if _is_parameter_bound(origin) or _is_spec_bound(origin):
-                fields.append((name, Any))
-
-        elif isinstance(origin, type) and issubclass(origin, Spec):
-            nested_transforms = _generate_transforms_class(origin)
-            if dataclass_fields(nested_transforms):
-                fields.append((name, nested_transforms))
-            else:
-                # Even empty, include for consistency
-                fields.append((name, nested_transforms))
-
-    class_name = f'{spec_cls.__name__}Transforms'
-    TransformsClass = make_dataclass(class_name, fields, frozen=True)
-
-    _transforms_class_cache[spec_cls] = TransformsClass
-    return TransformsClass
-
-
 class SpecMeta(ABCMeta):
     """Metaclass that generates Params, State, and Transforms classes for Specs."""
 
-    ATTRS = _GENERATED_ATTRS
+    ATTRS = ('Params', 'State', 'Transforms')
+
+    _params_cache: dict[type, type] = {}
+    _state_cache: dict[type, type] = {}
+    _transforms_cache: dict[type, type] = {}
 
     def __new__(mcs, name, bases, namespace, **kwargs):
         cls = super().__new__(mcs, name, bases, namespace, **kwargs)
@@ -190,11 +62,121 @@ class SpecMeta(ABCMeta):
             return cls
 
         # Generate and attach Params/State/Transforms classes
-        setattr(cls, 'Params', _generate_params_class(cls))
-        setattr(cls, 'State', _generate_state_class(cls))
-        setattr(cls, 'Transforms', _generate_transforms_class(cls))
+        setattr(cls, 'Params', mcs._generate_params_class(cls))
+        setattr(cls, 'State', mcs._generate_state_class(cls))
+        setattr(cls, 'Transforms', mcs._generate_transforms_class(cls))
 
         return cls
+
+    @classmethod
+    def _generate_params_class(mcs, spec_cls: type) -> type:
+        """Generate frozen dataclass for a Spec's parameters."""
+        if spec_cls in mcs._params_cache:
+            return mcs._params_cache[spec_cls]
+
+        hints = get_type_hints(spec_cls)
+        fields = []
+
+        for name, ann in hints.items():
+            if name in mcs.ATTRS:
+                continue
+
+            origin = get_origin(ann) or ann
+
+            if isinstance(origin, type) and issubclass(origin, Parameter):
+                inner_type = get_args(ann)[0] if get_args(ann) else Any
+                fields.append((name, inner_type))
+
+            elif isinstance(origin, TypeVar):
+                if _is_parameter_bound(origin) or _is_spec_bound(origin):
+                    fields.append((name, Any))
+
+            elif isinstance(origin, type) and issubclass(origin, Spec):
+                nested_params = mcs._generate_params_class(origin)
+                fields.append((name, nested_params))
+
+        class_name = f'{spec_cls.__name__}Params'
+        ParamsClass = make_dataclass(class_name, fields, frozen=True)
+
+        jax.tree_util.register_dataclass(
+            ParamsClass,
+            data_fields=[f[0] for f in fields],
+            meta_fields=[],
+        )
+
+        mcs._params_cache[spec_cls] = ParamsClass
+        return ParamsClass
+
+    @classmethod
+    def _generate_state_class(mcs, spec_cls: type) -> type:
+        """Generate frozen dataclass for a Spec's state."""
+        if spec_cls in mcs._state_cache:
+            return mcs._state_cache[spec_cls]
+
+        hints = get_type_hints(spec_cls)
+        fields = []
+
+        for name, ann in hints.items():
+            if name in mcs.ATTRS:
+                continue
+
+            origin = get_origin(ann) or ann
+
+            if isinstance(origin, type) and issubclass(origin, State):
+                inner_type = get_args(ann)[0] if get_args(ann) else Any
+                fields.append((name, Optional[inner_type], None))
+
+            elif isinstance(origin, type) and issubclass(origin, Spec):
+                nested_state = mcs._generate_state_class(origin)
+                if dataclass_fields(nested_state):
+                    fields.append((name, nested_state))
+
+        class_name = f'{spec_cls.__name__}State'
+        StateClass = make_dataclass(class_name, fields, frozen=True)
+
+        jax.tree_util.register_dataclass(
+            StateClass,
+            data_fields=[f[0] for f in fields],
+            meta_fields=[],
+        )
+
+        mcs._state_cache[spec_cls] = StateClass
+        return StateClass
+
+    @classmethod
+    def _generate_transforms_class(mcs, spec_cls: type) -> type:
+        """Generate frozen dataclass for a Spec's transforms."""
+        if spec_cls in mcs._transforms_cache:
+            return mcs._transforms_cache[spec_cls]
+
+        hints = get_type_hints(spec_cls)
+        fields = []
+
+        for name, ann in hints.items():
+            if name in mcs.ATTRS:
+                continue
+
+            origin = get_origin(ann) or ann
+
+            if isinstance(origin, type) and issubclass(origin, Parameter):
+                fields.append((name, Transform))
+
+            elif isinstance(origin, TypeVar):
+                if _is_parameter_bound(origin) or _is_spec_bound(origin):
+                    fields.append((name, Any))
+
+            elif isinstance(origin, type) and issubclass(origin, Spec):
+                nested_transforms = mcs._generate_transforms_class(origin)
+                if dataclass_fields(nested_transforms):
+                    fields.append((name, nested_transforms))
+                else:
+                    fields.append((name, nested_transforms))
+
+        class_name = f'{spec_cls.__name__}Transforms'
+        TransformsClass = make_dataclass(class_name, fields, frozen=True)
+
+        mcs._transforms_cache[spec_cls] = TransformsClass
+        return TransformsClass
 
 
 class Spec(ABC, Generic[P, S, Tr], metaclass=SpecMeta):
@@ -283,7 +265,7 @@ class Spec(ABC, Generic[P, S, Tr], metaclass=SpecMeta):
         params = {}
 
         for name, ann in hints.items():
-            if name in _GENERATED_ATTRS:
+            if name in SpecMeta.ATTRS:
                 continue
 
             origin = get_origin(ann) or ann
@@ -320,7 +302,7 @@ class Spec(ABC, Generic[P, S, Tr], metaclass=SpecMeta):
 
         for name, ann in hints.items():
             # Skip class attributes
-            if name in _GENERATED_ATTRS:
+            if name in SpecMeta.ATTRS:
                 continue
 
             origin = get_origin(ann) or ann
