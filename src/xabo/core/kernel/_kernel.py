@@ -1,9 +1,9 @@
 from abc import ABC, abstractmethod
 
 from beartype import beartype
+from trellis import Spec
 
-from ..spec._spec import P, S, Spec, Tr
-from ._types import KernelInputA, KernelInputB, KernelOutput
+from ._types import KernelInputA, KernelInputB, KernelOutput, P, S, Tr
 
 
 @beartype
@@ -15,4 +15,5 @@ class Kernel(Spec[P, S, Tr], ABC):
         params: P,
         x: KernelInputA,
         x_tick: KernelInputB,
-    ) -> KernelOutput: ...
+    ) -> KernelOutput:
+        ...

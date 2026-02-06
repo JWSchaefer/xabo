@@ -12,6 +12,7 @@ dependencies = [
   "networkx>=3.6.1",
   "optax>=0.2.6",
   "polars>=1.36.1",
+  "trellis",
 ]
 
 [build-system]
@@ -52,3 +53,6 @@ ignore = [
 [tool.pyright]
 reportInvalidTypeForm = false       # Forward refs to metaclass-generated types
 reportGeneralTypeIssues = "warning" # Downgrade to warning instead of error
+
+[tool.uv.sources]
+trellis = { path = "../trellis", editable = true }

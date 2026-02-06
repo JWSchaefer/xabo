@@ -1,9 +1,8 @@
 import jax.numpy as jnp
 from beartype import beartype
+from trellis.typing import typecheck
 
-from ..spec._spec import P, S, Tr
-from ..typing._typecheck import typecheck
-from ._mean import Mean
+from ._mean import Mean, P, S, Tr
 from ._types import MeanVector
 
 

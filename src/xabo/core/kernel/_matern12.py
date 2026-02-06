@@ -2,8 +2,8 @@ from typing import Generic
 
 import jax.numpy as jnp
 from beartype import beartype
+from trellis.typing import typecheck
 
-from ..typing._typecheck import typecheck
 from ._kernel import Kernel
 from ._types import KernelInputA, KernelInputB, KernelOutput, L
 
@@ -16,8 +16,8 @@ class Matern12(Kernel, Generic[L]):
     @typecheck
     def __call__(
         self,
-        state: "Matern12.State",
-        params: "Matern12.Params",
+        state: 'Matern12.State',
+        params: 'Matern12.Params',
         x: KernelInputA,
         x_tick: KernelInputB,
     ) -> KernelOutput:
